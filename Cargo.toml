@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "phantom-core",
+    "phantom-crypto"
+]
+resolver = "2"
