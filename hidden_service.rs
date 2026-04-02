@@ -18,3 +18,16 @@ pub fn derive_hidden_service_address(
     
     *hasher.finalize().as_bytes()
 }
+
+// Fix: Use Vec instead of array for dynamic signatures
+pub struct ServiceDescriptor {
+    pub sig_ed25519: Vec<u8>,
+}
+
+pub fn create_mock_descriptor() -> ServiceDescriptor {
+    // In constructors:
+    let mut descriptor = ServiceDescriptor {
+        sig_ed25519: vec![0u8; 64], // Fix: use vec! macro
+    };
+    descriptor
+}

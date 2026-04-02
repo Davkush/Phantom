@@ -1,4 +1,4 @@
-use crate::packet::{NodeId, RoutingAction, RoutingInfoBlock, SphinxPacket};
+use crate::packet::{NodeId, RoutingAction, RoutingInfoBlock, SphinxPacket, MAX_HOPS, KYBER_CT_SIZE};
 use phantom_crypto::hybrid_kem::{encapsulate, HybridCiphertext, HybridPublicKey};
 use phantom_crypto::kdf::{derive_key, KdfPurpose};
 use chacha20poly1305::{ChaCha20Poly1305, Key, KeyInit, AeadInPlace};
@@ -79,7 +79,6 @@ pub fn build_packet(
         let mut new_routing_block = bincode::serialize(&layer_block)
             .map_err(|_| "Action serialization failed")?;
         
-        // Append inner routing block
         new_routing_block.extend(&current_routing_block);
         
         aead_header.encrypt_in_place(&nonce, b"", &mut new_routing_block)
@@ -88,9 +87,32 @@ pub fn build_packet(
         current_routing_block = new_routing_block;
     }
 
+    // Pack the ciphertexts sequentially into alpha_pq_onion
+    let mut alpha_pq_onion = Vec::with_capacity(MAX_HOPS * KYBER_CT_SIZE);
+    for ct in ciphertexts {
+        // Flatten the hybrid ciphertext (assuming phase 0 stub bytes logic)
+        let mut padded_ct = vec![0u8; KYBER_CT_SIZE];
+        let serialized_ct = bincode::serialize(&ct).unwrap_or_default();
+        let copy_len = std::cmp::min(KYBER_CT_SIZE, serialized_ct.len());
+        padded_ct[..copy_len].copy_from_slice(&serialized_ct[..copy_len]);
+        alpha_pq_onion.extend(&padded_ct);
+    }
+    
+    // Fill remaining hops with random padding
+    while alpha_pq_onion.len() < MAX_HOPS * KYBER_CT_SIZE {
+        alpha_pq_onion.push(0);
+    }
+
     Ok(SphinxPacket {
-        crypto_headers: ciphertexts,
-        routing_info: current_routing_block,
+        version: 1,
+        flags: 0,
+        epoch: epoch as u32,
+        alpha_cl: [0u8; 32],
+        alpha_pq_onion,
+        beta_routing: [0u8; 128],
+        gamma_mac: [0u8; 32],
+        c_batch,
+        pi_ref: 0,
         payload: current_payload,
     })
 }

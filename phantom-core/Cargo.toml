@@ -1,0 +1,22 @@
+[package]
+name = "phantom-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Mechanical Fix: Ensure derive is enabled
+serde = { version = "1.0", features = ["derive"] }
+x25519-dalek = "2.0"
+pqcrypto-kyber = "0.8"
+# Security Fixes
+subtle = "2.5"           # Constant-time comparison (HIGH-04)
+zeroize = "1.7"          # Secure memory wiping
+# CRIT-02 Fix: Transparent ZK Proofs (No Trusted Setup)
+plonky2 = "0.1" 
+blake3 = "1.5"
+sha3 = "0.10"
+pqcrypto-traits = "0.3"
+rand_distr = "0.4"
+
+[dev-dependencies]
+proptest = "1.4"

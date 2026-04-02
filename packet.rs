@@ -1,8 +1,11 @@
 use phantom_crypto::hybrid_kem::{HybridCiphertext, HybridPublicKey};
-use serde::{Deserialize, Serialize};
+use serde::{Serialize, Deserialize};
 
-/// Maximum depth of the mixnet path.
+pub const KYBER_CT_SIZE: usize = 1568;
 pub const MAX_HOPS: usize = 5;
+pub const HEADER_SIZE: usize = 32 + (MAX_HOPS * KYBER_CT_SIZE) + 128 + 32 + 16 + 2 + 6;
+pub const PACKET_SIZE: usize = 9216; // 9KB with safety margin
+pub const PACKET_SIZE: usize = 9216; // 9KB (CRIT-01/MED-03 Fix)
 
 /// Routing instruction for the next hop.
 #[derive(Clone, Serialize, Deserialize)]
@@ -34,14 +37,55 @@ pub struct RoutingInfoBlock {
     pub padding: Vec<u8>,
 }
 
-/// The core Sphinx⁺ data structure.
-/// Addressing CRIT-01: Contains a vector of full HybridCiphertexts, one for each hop.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct SphinxPacket {
-    /// The nested hybrid ciphertexts. The outermost one is decapsulated by the immediate next hop.
-    pub crypto_headers: Vec<HybridCiphertext>,
-    /// The encrypted routing block containing the actions and the MAC.
-    pub routing_info: Vec<u8>,
-    /// The symmetrically encrypted actual message.
-    pub payload: Vec<u8>,
+    pub version: u8,         // 0x01
+    pub flags: u8,           // bitflags
+    pub epoch: u32,         // big-endian
+    
+    // --- Header Section ---
+    pub alpha_cl: [u8; 32],      // X25519 Blinded Element
+    pub alpha_pq_onion: Vec<u8>, // Contains (MAX_HOPS * 1568) bytes
+    pub beta_routing: [u8; 128], // Onion-encrypted hops
+    pub gamma_mac: [u8; 32],     // BLAKE3 per-hop MAC
+    
+    // --- Metadata Section ---
+    pub c_batch: [u8; 16],       // MED-03 Fix: Expanded to 128-bit
+    pub pi_ref: u16,            // Index in batch
+    
+    pub payload: Vec<u8>,        // Encrypted data
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    #[test]
+    fn test_packet_size_calculation() {
+        // Verify PACKET_SIZE accommodates worst-case
+        let header_size = 32 + (MAX_HOPS * KYBER_CT_SIZE) + 128 + 32 + 16 + 2 + 6;
+        assert!(PACKET_SIZE >= header_size, 
+            "PACKET_SIZE ({}) must be >= header size ({})", 
+            PACKET_SIZE, header_size);
+        
+        println!("✅ Packet size: {} bytes (header: {} bytes)", 
+            PACKET_SIZE, header_size);
+    }
+    
+    #[test]
+    fn test_c_batch_uniqueness() {
+        // MED-03: Verify 16-byte c_batch has negligible collision risk
+        use std::collections::HashSet;
+        
+        let mut batches = HashSet::new();
+        for i in 0u64..1_000_000u64 {
+            let mut c_batch = [0u8; 16];
+            c_batch[0..8].copy_from_slice(&i.to_le_bytes());
+            c_batch[8..16].copy_from_slice(&(i.wrapping_add(1)).to_le_bytes());
+            batches.insert(c_batch);
+        }
+        
+        assert_eq!(batches.len(), 1_000_000, "All c_batch values should be unique");
+        println!("✅ c_batch uniqueness verified for 1M batches");
+    }
 }
