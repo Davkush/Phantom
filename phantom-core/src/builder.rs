@@ -42,6 +42,7 @@ pub fn build_packet(
     let mut ciphertexts = Vec::with_capacity(hops);
 
     // Build the layers from innermost to outermost (backwards)
+    let mut initial_c_batch = c_batch;
     for i in (0..hops).rev() {
         // Generate ephemeral shared secret for this hop
         let pub_key = &path[i];
@@ -52,6 +53,10 @@ pub fn build_packet(
         
         let ss_bytes = shared_secret.as_bytes();
         
+        // 3. MED-01 Fix: Apply the metadata mask for this hop
+        // Since each hop XORs the mask, the client XORs all masks into the initial c_batch.
+        crate::processor::encrypt_metadata_hop(&mut initial_c_batch, ss_bytes);
+
         let header_key_bytes = derive_key(&ss_bytes, KdfPurpose::HeaderMac, b"routing_idx");
         let payload_key_bytes = derive_key(&ss_bytes, KdfPurpose::PayloadEncryption, b"payload_idx");
         
@@ -111,7 +116,7 @@ pub fn build_packet(
         alpha_pq_onion,
         beta_routing: [0u8; 128],
         gamma_mac: [0u8; 32],
-        c_batch,
+        c_batch: initial_c_batch,
         pi_ref: 0,
         payload: current_payload,
     })

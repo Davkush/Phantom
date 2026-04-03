@@ -7,6 +7,7 @@ use phantom_crypto::kdf::{derive_key, KdfPurpose};
 use chacha20poly1305::{ChaCha20Poly1305, Key, KeyInit, AeadInPlace};
 use chacha20poly1305::aead::{generic_array::GenericArray};
 use bincode;
+use blake3;
 
 /// Peels one layer off a Sphinx packet using the node's long-term mix keypair.
 /// Returns the RoutingAction intended for this node, and the new modified SphinxPacket 
@@ -26,8 +27,10 @@ pub fn process_packet(
     let hybrid_ss = node_keypair.decapsulate(&outermost_header)?;
     let ss_bytes = hybrid_ss.as_bytes();
 
-    // 3. Derive AEAD keys for MAC checking and decryption
-    let header_key_bytes = derive_key(&ss_bytes, KdfPurpose::HeaderMac, b"routing_idx");
+    // 3. MED-01 Fix: Mask the c_batch metadata field for the next hop
+    encrypt_metadata_hop(&mut packet.c_batch, ss_bytes);
+
+    // 4. Derive AEAD keys for MAC checking and decryption
     let payload_key_bytes = derive_key(&ss_bytes, KdfPurpose::PayloadEncryption, b"payload_idx");
     
     let payload_key = Key::from_slice(&payload_key_bytes.0);
@@ -56,6 +59,20 @@ pub fn process_packet(
     packet.routing_info.drain(0..block_size);
 
     Ok(root_block)
+}
+
+/// MED-01 Fix: Encrypts/Masks the c_batch metadata field for the next hop.
+/// This prevents a GPA from linking batches across different nodes.
+pub fn encrypt_metadata_hop(c_batch: &mut [u8; 16], hop_secret: &[u8; 32]) {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(hop_secret);
+    hasher.update(b"metadata_mask");
+    let mask = hasher.finalize();
+    let mask_bytes = mask.as_bytes();
+
+    for i in 0..16 {
+        c_batch[i] ^= mask_bytes[i];
+    }
 }
 
 /// CRIT-01 Fix: Restores bitwise unlinkability using Scalar Multiplication.
