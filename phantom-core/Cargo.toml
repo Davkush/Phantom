@@ -16,11 +16,14 @@ plonky2 = "0.1"
 blake3 = "1.5"
 base32 = "0.4"
 quinn = "0.10"
-rustls = { version = "0.21", features = ["dangerous_configuration"] }
+rustls = { version = "0.21", features = ["dangerous_configuration", "quic"] }
 rcgen = "0.11"
-sha3 = "0.10"
-pqcrypto-traits = "0.3"
-rand_distr = "0.4"
+rustls-pemfile = "1.0"
+rustls-native-certs = "0.6"
+ed25519-dalek = { version = "2.1", features = ["serde", "pkcs8"] }
+zeroize = { version = "1.7", features = ["derive"] }
+tokio-util = { version = "0.7", features = ["codec"] }
+futures-util = "0.3"
 
 [dev-dependencies]
 proptest = "1.4"

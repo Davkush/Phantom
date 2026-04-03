@@ -1,56 +1,56 @@
 use phantom_core::identity::IdentityManager;
-use phantom_core::dht::PhantomDHT;
-use phantom_core::cover::run_cover_loop;
+use phantom_core::transport::quic::PhantomTransport;
 use phantom_core::mix::run_mix_batch_loop;
+use tokio::sync::mpsc;
+use clap::Parser;
+use std::path::PathBuf;
+
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// Port to listen on
+    #[arg(short, long, default_value_t = 443)]
+    port: u16,
+
+    /// Directory for configuration and identity files
+    #[arg(short, long, default_value = "." )]
+    config_dir: PathBuf,
+}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // 1. Identity & Sybil Resistance
-    let id_manager = IdentityManager::load_or_generate("~/.phantom/identity.json")?;
-    println!("Node ID: {:?}", id_manager.node_id());
+    let args = Args::parse();
 
-    // MED-02 Fix: Solving Argon2id puzzle to get admission token
-    println!("Solving SR-DHT Admission Puzzle (Argon2id)...");
-    let admission_token = id_manager.solve_pow().await?; 
+    // 1. Identity & Crypto Bridge
+    let id_path = args.config_dir.join("identity.json");
+    let id_manager = IdentityManager::load_or_generate(id_path)?;
+    println!("Node ID: {:x?}", id_manager.node_id());
 
-    // 2. Network Initialization
-    let bootnodes = phantom_core::dht::load_bootnodes("bootnodes.txt")?;
-    let dht = PhantomDHT::start(id_manager.clone(), admission_token, bootnodes).await?;
-    println!("DHT Initialized. Connected to {} peers.", dht.peer_count().await);
+    // 2. Start Physical Transport (Attempt Port with fallback)
+    let transport = PhantomTransport::start(&id_manager, args.port).await?;
+    println!("QUIC Transport ACTIVE. Identity-to-TLS bridge operational.");
 
-    // 3. Parallel Operational Loops
-    let cover_handle = tokio::spawn(async move {
-        // HIGH-04: Poisson timing to evade ML detection
-        // run_cover_loop(100.0).await; 
+    // 3. Communications Channel (Wire -> Mix Processor)
+    let (mix_tx, mix_rx) = mpsc::channel(100);
+
+    // 4. Parallel Async Operational Loops
+    let wire_handle = tokio::spawn(async move {
+        println!("Wire Listener: Monitoring UDP/QUIC streams...");
+        transport.listen_loop(mix_tx).await;
     });
 
     let mix_handle = tokio::spawn(async move {
-        // CRIT-02: STARK-based verifiable shuffling
-        // run_mix_batch_loop().await;
-    });
-
-    let hs_handle = tokio::spawn(async move {
-        // Phase 3: Hidden Service Protocol Engine
-        run_hidden_service_loop("mockaddress.phantom".to_string()).await;
+        // Now takes packets from the physical wire via the channel
+        run_mix_batch_loop(mix_rx).await; 
     });
 
     println!("Phantom Node is OPERATIONAL.");
 
-    // Keep process alive
+    // Keep process alive and monitor handles
     tokio::select! {
-        res = cover_handle => println!("Cover loop exited: {:?}", res),
-        res = mix_handle => println!("Mixer loop exited: {:?}", res),
-        res = hs_handle => println!("Hidden Service loop exited: {:?}", res),
+        _ = wire_handle => println!("Wire listener exited."),
+        _ = mix_handle => println!("Mix processor exited."),
     }
 
     Ok(())
-}
-
-pub async fn run_hidden_service_loop(address: String) {
-    println!("Hidden Service Node Active on Virtual Darknet: {}", address);
-    // Bind to DHT, publish descriptor, wait for Rendezvous Handshake
-    loop {
-        // Keep checking for rendezvous requests
-        tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
-    }
 }

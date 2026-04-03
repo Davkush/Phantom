@@ -1,33 +1,44 @@
-use rand::{thread_rng, Rng, RngCore}; // Added RngCore
+use crate::cover::poisson::PoissonTimer;
+use crate::packet::SphinxPacket;
+use quinn::SendStream;
 
 pub const MIN_PACKET_SIZE: usize = 1200; // Standard QUIC minimum
 pub const MAX_PACKET_SIZE: usize = 9216; // Our new 9KB internal Sphinx size
 
-pub struct TrafficShaper;
+pub struct TrafficShaper {
+    pub poisson_timer: PoissonTimer,
+}
 
 impl TrafficShaper {
     /// HIGH-04 Fix: Adds random padding to the encrypted blob.
-    /// This ensures that the IP-layer packet size is not a constant 1452 bytes.
-    pub fn apply_padding(mut payload: Vec<u8>) -> Vec<u8> {
-        let mut rng = thread_rng();
-        
-        // We want to vary the final size to mimic standard HTTPS distribution.
-        // Most HTTPS packets are either small (ACKs/Headers) or MTU-sized.
-        let target_size = if rng.gen_bool(0.1) {
-            rng.gen_range(1200..1400) // Small burst
-        } else {
-            rng.gen_range(8000..MAX_PACKET_SIZE) // Large Sphinx-carrying packet
-        };
-
-        if payload.len() < target_size {
-            let padding_len = target_size - payload.len();
-            let mut padding = vec![0u8; padding_len];
-            rng.fill_bytes(&mut padding);
-            payload.extend(padding);
-        }
-        
-        payload
+    /// Deprecated in favor of 9KB fixed-size for all packet types.
+    pub fn apply_padding(payload: Vec<u8>) -> Vec<u8> {
+        let mut buffer = vec![0u8; MAX_PACKET_SIZE];
+        let copy_len = std::cmp::min(payload.len(), MAX_PACKET_SIZE);
+        buffer[..copy_len].copy_from_slice(&payload[..copy_len]);
+        buffer
     }
+
+    /// Applies Poisson-distributed delay and pads to exactly 9KB.
+    /// This is the primary physical dispatch hook for Ghost nodes.
+    pub async fn shape_and_send(
+        &self, 
+        mut stream: SendStream, 
+        packet: SphinxPacket
+    ) -> anyhow::Result<()> {
+        // 1. Fixed-size serialization (9KB)
+        let data = packet.serialize_to_9kb(); 
+        
+        // 2. Poisson Delay (HIGH-04 Fix)
+        let delay = self.poisson_timer.next_delay();
+        tokio::time::sleep(delay).await;
+
+        // 3. Physical Dispatch
+        stream.write_all(&data).await?;
+        stream.finish().await?;
+        Ok(())
+    }
+}
 }
 
 #[cfg(test)]

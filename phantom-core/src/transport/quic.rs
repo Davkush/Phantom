@@ -1,99 +1,100 @@
-use quinn::{Endpoint, ServerConfig};
-use rustls::{Certificate, PrivateKey};
+use quinn::{Endpoint, ServerConfig, TransportConfig};
 use std::sync::Arc;
 use std::net::SocketAddr;
-
-// Dummy representations for Identity/Packet because they are not formally fully defined in the module context here.
-pub struct IdentityManager {
-    pub node_id: [u8; 32],
-}
-impl IdentityManager {
-    pub fn node_id(&self) -> [u8; 32] { self.node_id }
-}
-
-pub struct SphinxPacket;
-impl SphinxPacket {
-    pub fn serialize(&self) -> Vec<u8> { vec![0u8; 9216] }
-}
-
-pub struct TrafficShaper;
-impl TrafficShaper {
-    pub fn apply_padding(data: Vec<u8>) -> Vec<u8> { data }
-}
-
-/// Generates a self-signed TLS certificate binding the Node's Ed25519 identity dynamically
-fn generate_self_signed_cert(identity: &IdentityManager) -> anyhow::Result<(Certificate, PrivateKey)> {
-    // Generate an ephemeral RCGen certificate (simulating binding to Ed25519 identity)
-    let subject_alt_names = vec!["phantom-node".to_string()];
-    let cert = rcgen::generate_simple_self_signed(subject_alt_names)?;
-    
-    let cert_der = cert.serialize_der()?;
-    let priv_key_der = cert.serialize_private_key_der();
-    
-    Ok((Certificate(cert_der), PrivateKey(priv_key_der)))
-}
+use crate::identity::IdentityManager;
+use crate::packet::SphinxPacket;
+use crate::transport::certificate::generate_node_certificate;
+use rand::Rng;
 
 pub struct PhantomTransport {
     pub endpoint: Endpoint,
-    pub node_id: [u8; 32],
 }
 
 impl PhantomTransport {
     /// Initializes a QUIC endpoint using the Node's Cryptographic Identity.
-    pub async fn new(identity: &IdentityManager, listen_port: u16) -> anyhow::Result<Self> {
+    /// Addressing HIGH-04: Port fallback logic (Port -> 4443).
+    pub async fn start(identity: &IdentityManager, preferred_port: u16) -> anyhow::Result<Self> {
         // 1. Generate a self-signed cert bound to the Ed25519 identity
-        let (cert, priv_key) = generate_self_signed_cert(identity)?;
+        let (cert, priv_key) = generate_node_certificate(identity)?;
         
         // 2. Configure Server with QUIC 'GREASE' and Header Protection (HIGH-04 Fix)
-        let mut server_config = ServerConfig::with_single_cert(vec![cert], priv_key)?;
-        let mut transport_config = quinn::TransportConfig::default();
-        transport_config.max_concurrent_uni_streams(100u32.into());
+        let server_config = ServerConfig::with_single_cert(vec![cert], priv_key)?;
+        let mut transport_config = TransportConfig::default();
+        
+        // Optimization for Mixnets: High concurrency of short-lived unidirectional streams
+        transport_config.max_concurrent_uni_streams(1000u32.into());
+        
         // Enable QUIC grease to prevent fingerprinting
         transport_config.initial_rtt(std::time::Duration::from_millis(100)); 
         
+        // SECURITY HIGH-04: Hybrid Rotation with Jittered Thresholds
+        // Decision: Maintain connections for max 10-15 mins with +/- 20% jitter
+        let mut rng = rand::thread_rng();
+        let timeout_secs = rng.gen_range(600..900); // 10 to 15 minutes
+        transport_config.max_idle_timeout(Some(std::time::Duration::from_secs(timeout_secs).try_into()?));
+        
+        // Disable keep-alives to prevent "persistent link" signature mapping
+        transport_config.keep_alive_interval(None);
+
+        let mut server_config = server_config;
         server_config.transport_config(Arc::new(transport_config));
 
         // 3. Bind to UDP port (with fallback)
-        let addr: SocketAddr = format!("0.0.0.0:{}", listen_port).parse()?;
-        let endpoint = Endpoint::server(server_config, addr)?;
+        let addr = SocketAddr::from(([0, 0, 0, 0], preferred_port));
+        let endpoint = match Endpoint::server(server_config.clone(), addr) {
+            Ok(ep) => ep,
+            Err(_) => {
+                println!("Permission denied for port {}, falling back to 4443.", preferred_port);
+                let fallback = SocketAddr::from(([0, 0, 0, 0], 4443));
+                Endpoint::server(server_config, fallback)?
+            }
+        };
 
-        Ok(Self {
-            endpoint,
-            node_id: identity.node_id(),
-        })
+        Ok(Self { endpoint })
     }
 
-    /// Sends a 9KB Sphinx Packet over the wire.
-    /// Applies Traffic Shaping (Poisson + Padding) before dispatch.
-    pub async fn send_packet(&self, target_addr: SocketAddr, packet: SphinxPacket) -> anyhow::Result<()> {
-        // 1. Serialize and Shape (HIGH-04 Mitigation)
-        let raw_data = packet.serialize();
-        let shaped_data = TrafficShaper::apply_padding(raw_data);
+    /// Sends a 9KB Sphinx Packet over the wire using the provided TrafficShaper.
+    pub async fn send_packet(
+        &self, 
+        target_addr: SocketAddr, 
+        packet: SphinxPacket,
+        shaper: &crate::transport::obfuscation::TrafficShaper
+    ) -> anyhow::Result<()> {
+        // 1. Establish or Re-use QUIC Connection
+        let connection = self.endpoint.connect(target_addr, "phantom-node")?.await?;
         
-        // 2. Establish or Re-use QUIC Connection
-        let conn = self.endpoint.connect(target_addr, "phantom-node")?.await?;
+        // 2. Open unidirectional stream
+        let stream = connection.open_uni().await?;
         
-        // 3. Send via Unidirectional Stream (Optimized for Mixnets)
-        let mut send_stream = conn.open_uni().await?;
-        send_stream.write_all(&shaped_data).await?;
-        send_stream.finish().await?;
+        // 3. Apply Traffic Shaping (Poisson + 9KB random padding) and Dispatch
+        shaper.shape_and_send(stream, packet).await?;
         
         Ok(())
     }
 
-    /// Receives incoming Sphinx packets and passes them to the Mix Batch Event Loop
-    pub async fn run_receive_loop(&self) -> anyhow::Result<()> {
+    /// Listens for incoming QUIC streams and injects them into the Mix Processor.
+    /// Addressing HIGH-04: Enforces 9216 byte read boundary.
+    pub async fn listen_loop(&self, tx: tokio::sync::mpsc::Sender<SphinxPacket>) {
         while let Some(conn) = self.endpoint.accept().await {
+            let tx = tx.clone();
             tokio::spawn(async move {
-                if let Ok(connection) = conn.await {
-                    while let Ok(mut stream) = connection.accept_uni().await {
-                        // Receive datagrams silently (queued for Mix Engine)
-                        let mut buf = vec![0u8; 10000];
-                        let _ = stream.read(&mut buf).await;
+                let connection = conn.await.ok()?;
+                while let Ok(mut stream) = connection.accept_uni().await {
+                    // Force 9KB buffer to ensure bitwise indistinguishability
+                    let mut buf = vec![0u8; crate::packet::PACKET_SIZE];
+                    if stream.read_exact(&mut buf).await.is_ok() {
+                        // Deserialize and inject into the mix engine
+                        if let Ok(pkt) = SphinxPacket::deserialize(&buf) {
+                            let _ = tx.send(pkt).await;
+                        }
                     }
                 }
+                Some(())
             });
         }
-        Ok(())
+    }
+    /// Returns the local address of the QUIC endpoint.
+    pub fn local_addr(&self) -> anyhow::Result<SocketAddr> {
+        Ok(self.endpoint.local_addr()?)
     }
 }

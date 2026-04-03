@@ -13,6 +13,8 @@ pub mod cover_traffic;
 pub mod dcnet;
 pub mod intro_point;
 pub mod rendezvous;
+pub mod mix;
+pub mod sentinel;
 
 #[cfg(test)]
 mod tests {
