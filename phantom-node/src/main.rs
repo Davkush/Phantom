@@ -29,13 +29,28 @@ async fn main() -> anyhow::Result<()> {
         // run_mix_batch_loop().await;
     });
 
+    let hs_handle = tokio::spawn(async move {
+        // Phase 3: Hidden Service Protocol Engine
+        run_hidden_service_loop("mockaddress.phantom".to_string()).await;
+    });
+
     println!("Phantom Node is OPERATIONAL.");
 
     // Keep process alive
     tokio::select! {
         res = cover_handle => println!("Cover loop exited: {:?}", res),
         res = mix_handle => println!("Mixer loop exited: {:?}", res),
+        res = hs_handle => println!("Hidden Service loop exited: {:?}", res),
     }
 
     Ok(())
+}
+
+pub async fn run_hidden_service_loop(address: String) {
+    println!("Hidden Service Node Active on Virtual Darknet: {}", address);
+    // Bind to DHT, publish descriptor, wait for Rendezvous Handshake
+    loop {
+        // Keep checking for rendezvous requests
+        tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+    }
 }

@@ -12,6 +12,7 @@ pub mod transport;
 pub mod cover_traffic;
 pub mod dcnet;
 pub mod intro_point;
+pub mod rendezvous;
 
 #[cfg(test)]
 mod tests {
