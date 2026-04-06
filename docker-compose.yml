@@ -1,0 +1,58 @@
+version: '3.8'
+
+# Phase 12: The Public Gauntlet - 50-Node Resilience Test
+# Adversarial Simulation: 30% Malicious Nodes (15/50)
+services:
+  # The Bootstrap/Genesis node
+  genesis:
+    build: 
+      context: .
+      dockerfile: phantom-node/Dockerfile
+    environment:
+      - PHANTOM_ROLE=genesis
+      - PHANTOM_SIM_LATENCY=100ms
+    networks:
+      phantom_net:
+        ipv4_address: 172.20.0.2
+
+  # 34 Honest relay nodes (The Backbone)
+  honest-relay:
+    build:
+      context: .
+      dockerfile: phantom-node/Dockerfile
+    deploy:
+      replicas: 34
+    environment:
+      - PHANTOM_BOOTSTRAP=172.20.0.2:443
+      - PHANTOM_SIM_LATENCY=250ms
+    networks:
+      - phantom_net
+    cap_add:
+      - NET_ADMIN
+
+  # 15 Malicious relay nodes (The Adversaries)
+  # Addressing HIGH-03: Verifies ejection of nodes that suppress STARK proofs.
+  malicious-relay:
+    build:
+      context: .
+      dockerfile: phantom-node/Dockerfile
+    deploy:
+      replicas: 15
+    environment:
+      - PHANTOM_BOOTSTRAP=172.20.0.2:443
+      - PHANTOM_SIM_LATENCY=250ms
+      - PHANTOM_ADVERSARIAL=true # Triggers proof suppression and selective dropping
+    networks:
+      - phantom_net
+    cap_add:
+      - NET_ADMIN
+
+networks:
+  phantom_net:
+    driver: bridge
+    driver_opts:
+      com.docker.network.driver.mtu: 9000 # 9216-byte Sphinx support
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/16
