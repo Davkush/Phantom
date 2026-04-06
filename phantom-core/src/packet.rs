@@ -2,7 +2,7 @@ use phantom_crypto::hybrid_kem::{HybridCiphertext, HybridPublicKey};
 use serde::{Serialize, Deserialize};
 use rand::{thread_rng, RngCore};
 
-pub const KYBER_CT_SIZE: usize = 1568;
+pub const KYBER_CT_SIZE: usize = 1600; // 32 (X25519) + 1568 (Kyber-1024)
 pub const MAX_HOPS: usize = 5;
 pub const HEADER_SIZE: usize = 32 + (MAX_HOPS * KYBER_CT_SIZE) + 128 + 32 + 16 + 2 + 6;
 pub const PACKET_SIZE: usize = 9216; // 9KB (CRIT-01/MED-03 Fix)
@@ -79,9 +79,9 @@ pub struct SphinxPacket {
     
     // --- Header Section ---
     pub alpha_cl: [u8; 32],      // X25519 Blinded Element
-    pub alpha_pq_onion: Vec<u8>, // Contains (MAX_HOPS * 1568) bytes
+    pub alpha_pq_onion: Vec<u8>, // Contains (MAX_HOPS * 1600) bytes
     pub beta_routing: [u8; 128], // Onion-encrypted hops
-    pub gamma_mac: [u8; 32],     // BLAKE3 per-hop MAC
+    pub gamma_mac: [u8; 32],     // SHAKE-256 per-hop MAC
     
     // --- Metadata Section ---
     pub c_batch: [u8; 16],       // MED-03 Fix: Expanded to 128-bit

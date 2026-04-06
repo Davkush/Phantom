@@ -94,20 +94,26 @@ pub fn build_packet(
         current_routing_block = new_routing_block;
     }
 
-    // Pack the ciphertexts sequentially into alpha_pq_onion
+    // Pack the ciphertexts sequentially into alpha_pq_onion (FIXED FO-COMPLIANCE)
     let mut alpha_pq_onion = Vec::with_capacity(MAX_HOPS * KYBER_CT_SIZE);
     for ct in ciphertexts {
-        // Flatten the hybrid ciphertext (assuming phase 0 stub bytes logic)
+        // Correctly serialize the FULL HybridCiphertext (1600 bytes)
         let mut padded_ct = vec![0u8; KYBER_CT_SIZE];
-        let serialized_ct = bincode::serialize(&ct).unwrap_or_default();
-        let copy_len = std::cmp::min(KYBER_CT_SIZE, serialized_ct.len());
-        padded_ct[..copy_len].copy_from_slice(&serialized_ct[..copy_len]);
+        let bytes = bincode::serialize(&ct).map_err(|_| "Failed to serialize ciphertext")?;
+        
+        if bytes.len() > KYBER_CT_SIZE {
+            return Err("HybridCiphertext exceeded KYBER_CT_SIZE - serious architectural layout mismatch");
+        }
+        
+        padded_ct[..bytes.len()].copy_from_slice(&bytes);
         alpha_pq_onion.extend(&padded_ct);
     }
     
-    // Fill remaining hops with random padding
+    // Fill remaining hops with random padding (Indistinguishable from Kyber noise)
     while alpha_pq_onion.len() < MAX_HOPS * KYBER_CT_SIZE {
-        alpha_pq_onion.push(0);
+        let mut noise = vec![0u8; KYBER_CT_SIZE];
+        thread_rng().fill_bytes(&mut noise);
+        alpha_pq_onion.extend(noise);
     }
 
     Ok(SphinxPacket {
