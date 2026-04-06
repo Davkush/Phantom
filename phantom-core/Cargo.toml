@@ -1,0 +1,35 @@
+[package]
+name = "phantom-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Mechanical Fix: Ensure derive is enabled
+serde = { version = "1.0", features = ["derive"] }
+x25519-dalek = "2.0"
+pqcrypto-kyber = "0.8"
+# Security Fixes
+subtle = "2.5"           # Constant-time comparison (HIGH-04)
+zeroize = "1.7"          # Secure memory wiping
+# CRIT-02 Fix: Transparent ZK Proofs (No Trusted Setup)
+plonky2 = "0.1" 
+blake3 = "1.5"
+base32 = "0.4"
+quinn = "0.10"
+rustls = { version = "0.21", features = ["dangerous_configuration", "quic"] }
+rcgen = "0.11"
+rustls-pemfile = "1.0"
+rustls-native-certs = "0.6"
+ed25519-dalek = { version = "2.1", features = ["serde", "pkcs8"] }
+zeroize = { version = "1.7", features = ["derive"] }
+tokio-util = { version = "0.7", features = ["codec"] }
+tokio-stream = "0.1"
+futures-util = "0.3"
+igd = { version = "0.12", features = ["aio"] }
+argon2 = "0.5"
+password-hash = "0.5"
+async-trait = "0.1"
+reqwest = "0.11"
+
+[dev-dependencies]
+proptest = "1.4"
