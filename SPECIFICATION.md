@@ -1,0 +1,50 @@
+# Phantom Protocol Technical Specification v1.0
+
+## 1. Mathematical Foundations
+
+### 1.1 Post-Quantum Sphinx Packet (9216 bytes)
+The Phantom Sphinx packet is designed to be **Bitwise and Volumetric Indistinguishable** from random noise.
+*   **Packet Size**: Exactly 9216 bytes (9KB) to accommodate the 1568-byte Kyber-1024 ciphertexts.
+*   **Entropy**: All packets, including dummy cover traffic, are padded with ChaCha20-derived high-entropy noise.
+*   **PQ Security**: Every hop performs a full Kyber-1024 decapsulation (PQ-KEM) and Ed25519-to-X25519 blinded scalar multiplication.
+
+### 1.2 STARK Verifiable Shuffling (Plonky2)
+To solve the "Relay Trust" problem, Phantom implements a permutation argument circuit.
+*   **Grand Product Argument**: A permutation $\pi$ of $n$ packets is proven via $H(in, \pi) = H(out)$.
+*   **Proof Size**: ~15-18KB (non-recursive).
+*   **Verification**: Proofs are propagated via GossipSub (`phantom/v1/shuffles`). Failure to broadcast a proof triggers automated DHT-based node ejection.
+
+## 2. Bidirectional Reliability & SURBs
+
+### 2.1 Single-Use Reply Blocks (SURBs)
+Phantom enables anonymous return paths without the exit node knowing the client's identity.
+*   **Piggybacking**: 5 SURBs are included in every outbound 9KB packet.
+*   **Replenishment**: SURB pools are maintained by the StreamManager to prevent TCP starvation.
+
+### 2.2 PhantomStream (The Reliability Layer)
+*   **Payload Envelope**: Encapsulates 9KB of data with a 128-bit stream identifier.
+*   **Cumulative ACKs**: 5-packet window with a 500ms heartbeat.
+
+## 3. Decentralized Infrastructure
+
+### 3.1 5-of-9 Multisig Governance
+The network's Genesis configuration and PoW difficulty are governed by a 9-member committee.
+*   **Threshold**: Any protocol-wide update requires 5 valid Ed25519 signatures.
+*   **Propagation**: Updates are distributed via the DHT `phantom/v1/upgrade` record.
+
+### 3.2 Reciprocal Routing (Tit-for-Tat)
+*   **Scoring**: Nodes maintain a local interaction ledger per NodeID.
+*   **Priority Lane**: Every 500 successful packet hand-offs grants a peer +1 priority boost (Max 10), reducing publication jitter.
+
+## 4. Operational Parameters
+
+| Parameter | Value | Description |
+| :--- | :--- | :--- |
+| **MTU** | 9000 (JUMBO) | Enforced to prevent 9KB Sphinx fragmentation |
+| **Poisson Interval** | 700ms | Publication window jitter ($\pm 50ms$) |
+| **Argon2id Diff** | T = 3, M = 64MB | Sybil resistance PoW |
+| **Max Hops** | 5 | Standard anonymity depth |
+| **Port Mapping** | UPnP Port 443 | Automatic NAT traversal |
+
+---
+*© 2026 Phantom Protocol Foundation. Released under Apache 2.0.*
