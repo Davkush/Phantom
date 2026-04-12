@@ -13,7 +13,6 @@ bloomfilter = "1.0"
 plonky2 = "=0.2.2"
 # Security Fixes (Pinned)
 subtle = "=2.5.0"           
-zeroize = "=1.7.0"          
 # CRIT-02 Fix: Transparent ZK Proofs (No Trusted Setup)
 blake3 = "=1.5.0"
 tiny-keccak = { version = "=2.0.2", features = ["shake"] }
