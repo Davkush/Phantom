@@ -12,120 +12,126 @@ use rand::{thread_rng, RngCore};
 /// `path`: The ordered list of node public keys representing the circuit.
 /// `actions`: What each node should do. The final action must be `Deliver`.
 /// `payload`: The serialized message/payload to send.
+use crate::constants::*;
+
+/// Builds a Sphinx⁺ packet using layered encryption (onion routing).
 pub fn build_packet(
     path: &[HybridPublicKey],
     actions: &[RoutingAction],
     payload: &[u8],
     c_batch: [u8; 16],
-    epoch: u64
+    epoch: u32
 ) -> Result<SphinxPacket, &'static str> {
     if path.len() != actions.len() || path.is_empty() {
         return Err("Path and actions length mismatch or empty");
     }
 
     let hops = path.len();
+    let mut rng = thread_rng();
     
-    // We will build the packet inside-out, starting from the final receiver backwards.
-    let mut current_payload = payload.to_vec();
+    // 1. Initial State: Internal Payload and dummy Sidecar
+    let mut current_payload = vec![0u8; PAYLOAD_SIZE];
+    let copy_len = std::cmp::min(payload.len(), PAYLOAD_SIZE);
+    current_payload[..copy_len].copy_from_slice(&payload[..copy_len]);
     
-    // For routing info, we also build backwards. Currently stubbed routing block for simplicity.
-    // In full Sphinx, this involves a carefully padded byte array shifted and XOR'd using
-    // a PRNG seed. To simulate the cryptography for Phase 0, we'll just iteratively wrap 
-    // the routing instructions in AEAD.
-    
-    let mut current_routing_block = bincode::serialize(&crate::packet::RoutingInfoBlock {
-        mac: [0u8; 32],
-        action: RoutingAction::Deliver,
-        c_batch,
-        epoch,
-        padding: vec![],
-    }).map_err(|_| "Failed to serialize routing action")?;
+    let mut current_sidecar = [0u8; SIDECAR_SIZE];
+    rng.fill_bytes(&mut current_sidecar);
 
-    let mut ciphertexts = Vec::with_capacity(hops);
+    let mut current_beta = [0u8; ROUTING_INFO_SIZE];
+    rng.fill_bytes(&mut current_beta);
+
+    let mut outermost_kem = [0u8; KEM_BLOCK_SIZE];
 
     // Build the layers from innermost to outermost (backwards)
-    let mut initial_c_batch = c_batch;
     for i in (0..hops).rev() {
-        // Generate ephemeral shared secret for this hop
         let pub_key = &path[i];
         let (ct, shared_secret) = encapsulate(pub_key)?;
-        
-        // We push to the front so the outermost hop is at index 0.
-        ciphertexts.insert(0, ct);
-        
         let ss_bytes = shared_secret.as_bytes();
         
-        // 3. MED-01 Fix: Apply the metadata mask for this hop
-        // Since each hop XORs the mask, the client XORs all masks into the initial c_batch.
-        crate::processor::encrypt_metadata_hop(&mut initial_c_batch, ss_bytes);
+        // Serialize CT for this hop
+        let ct_bytes = bincode::serialize(&ct).map_err(|_| "CT serialization failed")?;
 
         let header_key_bytes = derive_key(&ss_bytes, KdfPurpose::HeaderMac, b"routing_idx");
         let payload_key_bytes = derive_key(&ss_bytes, KdfPurpose::PayloadEncryption, b"payload_idx");
         
-        let payload_key = Key::from_slice(&payload_key_bytes.0);
         let header_key = Key::from_slice(&header_key_bytes.0);
+        let payload_key = Key::from_slice(&payload_key_bytes.0);
         
-        let aead_payload = ChaCha20Poly1305::new(payload_key);
         let aead_header = ChaCha20Poly1305::new(header_key);
-        
-        // Single statically zeroed nonce since keys are ephemeral and strictly single-use
+        let aead_payload = ChaCha20Poly1305::new(payload_key);
         let nonce = GenericArray::from([0u8; 12]);
         
-        // Encrypt payload layer
+        // --- PREPARE NEXT LAYER ---
+        // 1. Encrypt Payload
         aead_payload.encrypt_in_place(&nonce, b"", &mut current_payload)
             .map_err(|_| "Payload encryption failed")?;
             
-        // Encrypt routing info layer
-        let layer_block = crate::packet::RoutingInfoBlock {
-            mac: [0u8; 32],
-            action: actions[i].clone(),
-            c_batch,
-            epoch,
-            padding: vec![],
-        };
-        let mut new_routing_block = bincode::serialize(&layer_block)
-            .map_err(|_| "Action serialization failed")?;
-        
-        new_routing_block.extend(&current_routing_block);
-        
-        aead_header.encrypt_in_place(&nonce, b"", &mut new_routing_block)
-            .map_err(|_| "Routing block encryption failed")?;
-            
-        current_routing_block = new_routing_block;
-    }
+        // 2. Encrypt Sidecar
+        aead_header.encrypt_in_place(&nonce, b"", &mut current_sidecar)
+            .map_err(|_| "Sidecar encryption failed")?;
 
-    // Pack the ciphertexts sequentially into alpha_pq_onion (FIXED FO-COMPLIANCE)
-    let mut alpha_pq_onion = Vec::with_capacity(MAX_HOPS * KYBER_CT_SIZE);
-    for ct in ciphertexts {
-        // Correctly serialize the FULL HybridCiphertext (1600 bytes)
-        let mut padded_ct = vec![0u8; KYBER_CT_SIZE];
-        let bytes = bincode::serialize(&ct).map_err(|_| "Failed to serialize ciphertext")?;
+        // 3. Prepare Routing Block for THIS hop
+        // MED-03 Fix: Bind c_batch to node_id and shared secret to prevent linkage
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(&c_batch); // Original batch secret
+        hasher.update(&path[i].x25519_pub); // Bind to target node's identity
+        let hop_c_batch: [u8; 16] = hasher.finalize().as_bytes()[0..16].try_into().unwrap();
+
+        let routing_block = RoutingInfoBlock {
+            action: actions[i].clone(),
+            c_batch: hop_c_batch,
+            epoch,
+        };
+        let mut routing_bytes = bincode::serialize(&routing_block)
+            .map_err(|_| "Routing block serialization failed")?;
         
-        if bytes.len() > KYBER_CT_SIZE {
-            return Err("HybridCiphertext exceeded KYBER_CT_SIZE - serious architectural layout mismatch");
+        let mut new_beta = [0u8; ROUTING_INFO_SIZE];
+        let copy_len = std::cmp::min(routing_bytes.len(), ROUTING_INFO_SIZE);
+        new_beta[..copy_len].copy_from_slice(&routing_bytes[..copy_len]);
+        
+        // Encrypt Routing Onion (Beta)
+        aead_header.encrypt_in_place(&nonce, b"", &mut new_beta)
+            .map_err(|_| "Routing onion encryption failed")?;
+        
+        current_beta = new_beta;
+
+        // 4. Compute MAC for this state
+        let mut shake = Shake::v256();
+        let mac_verification_key = derive_key(&shared_secret.x25519_ss, KdfPurpose::HeaderMac, b"mac_check");
+        shake.update(&mac_verification_key.0);
+        shake.update(b"PHANTOM_HEADER_MAC");
+        
+        shake.update(&PROTOCOL_VERSION.to_le_bytes());
+        shake.update(&epoch.to_le_bytes());
+        shake.update(&ct_bytes); // current_kem
+        shake.update(&current_beta);
+        shake.update(&current_sidecar);
+        shake.update(&current_payload);
+        
+        let mut computed_mac = [0u8; 32];
+        shake.finalize(&mut computed_mac);
+        last_mac = computed_mac;
+
+        // 5. Update state for next (outer) hop
+        if i > 0 {
+            // Shift the current KEM into the sidecar for the next hop
+            let mut shifted_sidecar = [0u8; SIDECAR_SIZE];
+            shifted_sidecar[0..KEM_BLOCK_SIZE].copy_from_slice(&ct_bytes);
+            shifted_sidecar[KEM_BLOCK_SIZE..].copy_from_slice(&current_sidecar[0..(SIDECAR_SIZE - KEM_BLOCK_SIZE)]);
+            current_sidecar = shifted_sidecar;
+        } else {
+            // This was the outermost hop
+            outermost_kem.copy_from_slice(&ct_bytes);
         }
-        
-        padded_ct[..bytes.len()].copy_from_slice(&bytes);
-        alpha_pq_onion.extend(&padded_ct);
-    }
-    
-    // Fill remaining hops with random padding (Indistinguishable from Kyber noise)
-    while alpha_pq_onion.len() < MAX_HOPS * KYBER_CT_SIZE {
-        let mut noise = vec![0u8; KYBER_CT_SIZE];
-        thread_rng().fill_bytes(&mut noise);
-        alpha_pq_onion.extend(noise);
     }
 
     Ok(SphinxPacket {
-        version: 1,
-        flags: 0,
-        epoch: epoch as u32,
-        alpha_cl: [0u8; 32],
-        alpha_pq_onion,
-        beta_routing: [0u8; 128],
-        gamma_mac: [0u8; 32],
-        c_batch: initial_c_batch,
-        pi_ref: 0,
+        version: PROTOCOL_VERSION,
+        epoch,
+        current_kem: outermost_kem,
+        beta_routing: current_beta,
+        gamma_mac: last_mac,
+        kem_sidecar: current_sidecar,
         payload: current_payload,
     })
 }

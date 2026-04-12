@@ -1,38 +1,48 @@
 use crate::packet::{RoutingAction, RoutingInfoBlock, SphinxPacket};
+use crate::constants::*;
 use x25519_dalek::{PublicKey, StaticSecret};
 use subtle::ConstantTimeEq;
 use rand::{thread_rng, RngCore};
-use crate::hybrid_kem::{HybridKeyPair, HybridCiphertext};
+use crate::hybrid_kem::{HybridKeyPair, HybridCiphertext, HybridSharedSecret};
 use crate::kdf::{derive_key, KdfPurpose};
 use chacha20poly1305::{ChaCha20Poly1305, Key, KeyInit, AeadInPlace};
 use chacha20poly1305::aead::{generic_array::GenericArray};
 use bincode;
 use tiny_keccak::{Hasher, Shake};
 
-/// Peels one layer off a Sphinx packet using the node's long-term mix keypair.
-/// Returns the RoutingAction intended for this node, and the new modified SphinxPacket 
-/// to be sent to the next hop.
+use crate::replay_cache::ReplayCache;
+
 pub fn process_packet(
     node_keypair: &HybridKeyPair,
-    packet: &mut SphinxPacket
+    packet: &mut SphinxPacket,
+    replay_cache: &mut ReplayCache
 ) -> Result<RoutingInfoBlock, &'static str> {
-    if packet.alpha_pq_onion.is_empty() {
-        return Err("No layers left to peel");
+    // 1. Step 1: Classical Decapsulation for MAC Verification
+    let my_ct: HybridCiphertext = bincode::deserialize(&packet.current_kem)
+        .map_err(|_| "Failed to deserialize HybridCiphertext")?;
+    
+    let x25519_ss = node_keypair.decapsulate_x25519(&my_ct);
+    
+    // 2. Early MAC Key Derivation
+    let mac_key = derive_key(&x25519_ss, KdfPurpose::HeaderMac, b"mac_check");
+    
+    // 3. CRITICAL: Verify MAC before expensive/sensitive Kyber decapsulation
+    verify_mac(packet, &mac_key.0).map_err(|_| "MAC verification failed - dropping packet")?;
+
+    // 4. LOW-01 Fix: Replay Protection (AFTER MAC verification)
+    // Caching the current hop's KEM block (replay tag).
+    let tag: [u8; 32] = blake3::hash(&packet.current_kem).into();
+    if !replay_cache.insert(tag) {
+        return Err("Replayed packet detected - dropping");
     }
+
+    // 5. Step 2: PQ Decapsulation (Safe now that MAC and Replay are checked)
+    let kyber_ss = node_keypair.decapsulate_kyber(&my_ct)?;
     
-    // 1. FO-COMPLIANT PEEL: Pop the outermost 1600-byte HybridCiphertext
-    let my_ct_bytes = process_pq_onion(&mut packet.alpha_pq_onion);
-    let my_ct: HybridCiphertext = bincode::deserialize(&my_ct_bytes)
-        .map_err(|_| "Failed to deserialize HybridCiphertext - FO transform violated")?;
-    
-    // 2. Decapsulate FULL ciphertext to retrieve the shared secret
-    let hybrid_ss = node_keypair.decapsulate(&my_ct)?;
+    let hybrid_ss = HybridSharedSecret { x25519_ss, kyber_ss };
     let ss_bytes = hybrid_ss.as_bytes();
 
-    // 3. MED-01 Fix: Mask the c_batch metadata field for the next hop
-    encrypt_metadata_hop(&mut packet.c_batch, ss_bytes);
-
-    // 4. Derive AEAD keys for MAC checking and decryption
+    // 5. Derive keys for decryption layers
     let header_key_bytes = derive_key(&ss_bytes, KdfPurpose::HeaderMac, b"routing_idx");
     let payload_key_bytes = derive_key(&ss_bytes, KdfPurpose::PayloadEncryption, b"payload_idx");
     
@@ -43,26 +53,31 @@ pub fn process_packet(
     let aead_payload = ChaCha20Poly1305::new(payload_key);
     let nonce = GenericArray::from([0u8; 12]);
 
-    // 5. Decrypt in place (Header and Payload)
-    aead_header.decrypt_in_place(&nonce, b"", &mut packet.routing_info)
-        .map_err(|_| "Routing block decryption/MAC failed")?;
+    // 6. Decrypt Header (Routing Info) and Sidecar
+    aead_header.decrypt_in_place(&nonce, b"", &mut packet.beta_routing)
+        .map_err(|_| "Routing block decryption failed")?;
+        
+    aead_header.decrypt_in_place(&nonce, b"", &mut packet.kem_sidecar)
+        .map_err(|_| "KEM sidecar decryption failed")?;
         
     aead_payload.decrypt_in_place(&nonce, b"", &mut packet.payload)
-        .map_err(|_| "Payload decryption/MAC failed")?;
+        .map_err(|_| "Payload decryption failed")?;
 
-    // 6. Extract the routing action and metadata intended for this node
-    let root_block: RoutingInfoBlock = bincode::deserialize(&packet.routing_info)
+    // 7. Extract the routing action intended for this node
+    let root_block: RoutingInfoBlock = bincode::deserialize(&packet.beta_routing)
         .map_err(|_| "Failed to deserialize routing block")?;
         
-    // 7. CRITICAL: Maintain Packet Size Invariant
-    // Shift routing info and pad the tail with random bytes
-    let block_size = bincode::serialized_size(&root_block)
-        .map_err(|_| "Failed to get block size")? as usize;
-    packet.routing_info.drain(0..block_size);
+    // 8. UPDATE FOR NEXT HOP (Approach B Peeling)
+    // Shift the sidecar into the current KEM slot
+    packet.current_kem.copy_from_slice(&packet.kem_sidecar[0..KEM_BLOCK_SIZE]);
     
-    let mut padding = vec![0u8; block_size];
-    thread_rng().fill_bytes(&mut padding);
-    packet.routing_info.extend(padding); // Keep routing_info at constant size (e.g. 128 bytes)
+    let mut next_sidecar = [0u8; SIDECAR_SIZE];
+    next_sidecar[0..(SIDECAR_SIZE - KEM_BLOCK_SIZE)].copy_from_slice(&packet.kem_sidecar[KEM_BLOCK_SIZE..]);
+    thread_rng().fill_bytes(&mut next_sidecar[(SIDECAR_SIZE - KEM_BLOCK_SIZE)..]);
+    packet.kem_sidecar.copy_from_slice(&next_sidecar);
+
+    // Refresh Routing Onion (Beta)
+    thread_rng().fill_bytes(&mut packet.beta_routing);
 
     Ok(root_block)
 }
@@ -91,80 +106,21 @@ pub fn blind_x25519(alpha_bytes: &mut [u8; 32], blind_bytes: &[u8; 32]) {
     *alpha_bytes = blinded.to_bytes();
 }
 
-/// CRIT-01 Fix: Restores PQ Security by peeling a FULL Kyber Ciphertext (1600 bytes).
-pub fn process_pq_onion(onion: &mut Vec<u8>) -> [u8; 1600] {
-    // 1. Extract the first full 1600 bytes for this node (X25519 + Kyber)
-    let mut my_ct = [0u8; 1600];
-    my_ct.copy_from_slice(&onion[0..1600]);
-    
-    // 2. Shift the onion left (Peel)
-    let next_onion_data = &onion[1600..];
-    let mut new_onion = next_onion_data.to_vec();
-    
-    // 3. Pad with random noise to maintain fixed size (Path length hiding)
-    let mut padding = vec![0u8; 1600];
-    thread_rng().fill_bytes(&mut padding);
-    new_onion.extend(padding);
-    
-    *onion = new_onion;
-    my_ct
-}
-
-fn generate_kyber_like_padding(_size: usize) -> Vec<u8> {
-    // Use Kyber's polynomial encoding structure to make padding indistinguishable
-    // This prevents statistical analysis of onion structure
-    // Mocking to avoid panics on from_bytes([0]) during phase 0
-    let mut dummy = vec![0u8; 1568];
-    thread_rng().fill_bytes(&mut dummy);
-    dummy
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_process_pq_onion_peels_and_pads() {
-        let max_hops = 5;
-        let ct_size = 1568;
-        let mut onion = vec![0u8; max_hops * ct_size];
-        
-        // Mark the first node's ciphertext with a specific pattern
-        for i in 0..ct_size {
-            onion[i] = (i % 256) as u8;
-        }
-
-        // Mark the second node's ciphertext with another pattern
-        for i in ct_size..(ct_size * 2) {
-            onion[i] = 0xAA;
-        }
-
-        let initial_len = onion.len();
-        
-        // Peel the first layer
-        let my_ct = process_pq_onion(&mut onion);
-        
-        // Verification 1: Length must be rigorously constant to hide path depth
-        assert_eq!(onion.len(), initial_len, "Onion size must remain constant to prevent depth-leaking side channels");
-        
-        // Verification 2: Peeling logic must correctly align the next nodes CT
-        // The first 1568 bytes of the NEW onion should be exactly the old 2nd ciphertext
-        assert_eq!(onion[0..ct_size], vec![0xAA; ct_size][..], "The PQ Onion was not shifted correctly");
-        
-        // Verification 3: The extracted ciphertext must match the marked pattern perfectly
-        for i in 0..ct_size {
-            assert_eq!(my_ct[i], (i % 256) as u8, "Extracted Kyber ciphertext was corrupted during extraction");
-        }
-    }
-}
-
-/// HIGH-04 Fix: Constant-time MAC Verification. (SHAKE-256 FO-compliant)
+/// HIGH-04 Fix: Constant-time MAC Verification using SHAKE-256.
 pub fn verify_mac(pkt: &SphinxPacket, key: &[u8]) -> Result<(), String> {
     let mut shake = Shake::v256();
     shake.update(key);
     shake.update(b"PHANTOM_HEADER_MAC");
-    // In production, we hash the entire packet structure to ensure total immutability
-    // b3.update(&serialize_for_mac(pkt));
+    
+    // Header binding: Hash all fields to ensure bit-level integrity before decapsulation.
+    shake.update(&pkt.version.to_le_bytes());
+    shake.update(&pkt.epoch.to_le_bytes());
+    shake.update(&pkt.current_kem);
+    shake.update(&pkt.beta_routing);
+    shake.update(&pkt.kem_sidecar);
+    // Note: In high-performance nodes, payload hashing can be deferred or probabilistic.
+    // For Phase 1 hardening, we enforce full integrity.
+    shake.update(&pkt.payload);
     
     let mut computed = [0u8; 32];
     shake.finalize(&mut computed);

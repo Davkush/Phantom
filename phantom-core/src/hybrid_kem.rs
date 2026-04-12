@@ -71,19 +71,32 @@ impl HybridKeyPair {
         }
     }
 
-    /// Decapsulate a received hybrid ciphertext to recover the shared secret.
-    pub fn decapsulate(&self, ct: &HybridCiphertext) -> Result<HybridSharedSecret, &'static str> {
+    /// Step 1: Decapsulate only the classical X25519 component.
+    /// Used for early MAC verification before expensive/sensitive PQ processing.
+    pub fn decapsulate_x25519(&self, ct: &HybridCiphertext) -> [u8; 32] {
         let sender_x25519_pub = X25519PublicKey::from(ct.x25519_ephemeral_pub);
         let x25519_ss = self.x25519_secret.diffie_hellman(&sender_x25519_pub);
+        *x25519_ss.as_bytes()
+    }
 
+    /// Step 2: Decapsulate the PQ Kyber component.
+    pub fn decapsulate_kyber(&self, ct: &HybridCiphertext) -> Result<[u8; kyber1024::shared_secret_bytes()], &'static str> {
         let kyber_ct_struct = kyber1024::Ciphertext::from_bytes(&ct.kyber_ct)
             .map_err(|_| "Invalid Kyber ciphertext")?;
             
         let kyber_ss = kyber1024::decapsulate(&kyber_ct_struct, &self.kyber_secret);
+        
+        Ok(kyber_ss.as_bytes().try_into().expect("Kyber ss length mismatch"))
+    }
+
+    /// Decapsulate a received hybrid ciphertext to recover the shared secret.
+    pub fn decapsulate(&self, ct: &HybridCiphertext) -> Result<HybridSharedSecret, &'static str> {
+        let x25519_ss = self.decapsulate_x25519(ct);
+        let kyber_ss = self.decapsulate_kyber(ct)?;
 
         Ok(HybridSharedSecret {
-            x25519_ss: *x25519_ss.as_bytes(),
-            kyber_ss: kyber_ss.as_bytes().try_into().expect("Kyber ss length mismatch"),
+            x25519_ss,
+            kyber_ss,
         })
     }
 }

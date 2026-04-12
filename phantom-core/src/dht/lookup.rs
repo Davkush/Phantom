@@ -32,11 +32,17 @@ impl DhtNode {
     async fn single_path_lookup(&self, _target_id: [u8; 32], _path: usize) -> Option<NodeDescriptor> { None }
     
     fn find_consensus(&self, results: Vec<NodeDescriptor>, quorum: usize) -> Option<NodeDescriptor> { 
-        // A minimal quorum consensus simulation for Phase 0
-        if results.len() >= quorum {
-            Some(results[0].clone())
-        } else {
-            None
+        use std::collections::HashMap;
+        
+        let mut counts = HashMap::new();
+        for res in results {
+            // In production, we'd hash the descriptor for the map key
+            let key = blake3::hash(&bincode::serialize(&res).unwrap_or_default());
+            counts.entry(key).or_insert((0, res)).0 += 1;
         }
+
+        counts.into_values()
+            .find(|(count, _res)| *count >= quorum)
+            .map(|(_count, res)| res)
     }
 }

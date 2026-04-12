@@ -1,11 +1,7 @@
+use crate::constants::*;
 use phantom_crypto::hybrid_kem::{HybridCiphertext, HybridPublicKey};
 use serde::{Serialize, Deserialize};
 use rand::{thread_rng, RngCore};
-
-pub const KYBER_CT_SIZE: usize = 1600; // 32 (X25519) + 1568 (Kyber-1024)
-pub const MAX_HOPS: usize = 5;
-pub const HEADER_SIZE: usize = 32 + (MAX_HOPS * KYBER_CT_SIZE) + 128 + 32 + 16 + 2 + 6;
-pub const PACKET_SIZE: usize = 9216; // 9KB (CRIT-01/MED-03 Fix)
 
 /// Routing instruction for the next hop.
 #[derive(Clone, Serialize, Deserialize)]
@@ -33,14 +29,11 @@ pub struct NodeId(pub [u8; 32]);
 /// maintain constant packet sizes.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct RoutingInfoBlock {
-    pub mac: [u8; 32],
     pub action: RoutingAction,
     /// Addressing MED-03: expanded to 16 bytes and encrypted per hop.
     pub c_batch: [u8; 16],
     /// Addressing HIGH-05: epoch is now encrypted per hop inside the routing block.
-    pub epoch: u64,
-    /// Chacha20 stream output to pad the routing block back to constant length when a layer is removed.
-    pub padding: Vec<u8>,
+    pub epoch: u32,
 }
 
 /// Phase 5, 6 & 7: PhantomStreamHeader for MTU management, reassembly, and reliability.
@@ -73,21 +66,23 @@ pub struct PayloadEnvelope {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct SphinxPacket {
-    pub version: u8,         // 0x01
-    pub flags: u8,           // bitflags
-    pub epoch: u32,         // big-endian
+    pub version: u8,
+    pub epoch: u32,
     
-    // --- Header Section ---
-    pub alpha_cl: [u8; 32],      // X25519 Blinded Element
-    pub alpha_pq_onion: Vec<u8>, // Contains (MAX_HOPS * 1600) bytes
-    pub beta_routing: [u8; 128], // Onion-encrypted hops
-    pub gamma_mac: [u8; 32],     // SHAKE-256 per-hop MAC
+    /// Current hop KEM block (1600 B: 32B X25519 Ephemeral PK + 1568B Kyber-1024 CT)
+    pub current_kem: [u8; KEM_BLOCK_SIZE],
     
-    // --- Metadata Section ---
-    pub c_batch: [u8; 16],       // MED-03 Fix: Expanded to 128-bit
-    pub pi_ref: u16,            // Index in batch
+    /// Onion-encrypted routing info for this hop (68 B)
+    pub beta_routing: [u8; ROUTING_INFO_SIZE],
     
-    pub payload: Vec<u8>,        // Encrypted data
+    /// Per-hop MAC (32 B BLAKE3) - Must be verified BEFORE Kyber decapsulation
+    pub gamma_mac: [u8; MAC_SIZE],
+    
+    /// KEM sidecar (6400 B: 4 remaining hops, onion-encrypted)
+    pub kem_sidecar: [u8; SIDECAR_SIZE],
+    
+    /// Encrypted payload (1116 B)
+    pub payload: Vec<u8>,
 }
 
 use rand::{thread_rng, RngCore};
@@ -130,14 +125,15 @@ mod tests {
     
     #[test]
     fn test_packet_size_calculation() {
-        // Verify PACKET_SIZE accommodates worst-case
-        let header_size = 32 + (MAX_HOPS * KYBER_CT_SIZE) + 128 + 32 + 16 + 2 + 6;
-        assert!(PACKET_SIZE >= header_size, 
+        // Verify PACKET_SIZE accommodates the full Approach B header
+        let header_calc = KEM_BLOCK_SIZE + ROUTING_INFO_SIZE + MAC_SIZE + SIDECAR_SIZE;
+        assert_eq!(header_calc, HEADER_TOTAL_SIZE);
+        assert!(PACKET_SIZE >= HEADER_TOTAL_SIZE, 
             "PACKET_SIZE ({}) must be >= header size ({})", 
-            PACKET_SIZE, header_size);
+            PACKET_SIZE, HEADER_TOTAL_SIZE);
         
-        println!("✅ Packet size: {} bytes (header: {} bytes)", 
-            PACKET_SIZE, header_size);
+        println!("✅ Approach B Packet size: {} bytes (header: {} bytes)", 
+            PACKET_SIZE, HEADER_TOTAL_SIZE);
     }
     
     #[test]

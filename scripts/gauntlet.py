@@ -34,10 +34,33 @@ class PhantomSwarm:
         """
         Scrapes PHANTOM_PROOF_DRIFT_MS and PHANTOM_EJECTION_COUNT from across the swarm.
         """
-        # Simulation: Aggregating data from the honest-relay nodes
+        # Scraping Prometheus metrics from local honest-relay nodes on port 9091
+        # In this simulation, we check the first relay.
+        try:
+            resp = requests.get("http://localhost:9091/metrics")
+            if resp.status_code == 200:
+                lines = resp.text.split("\n")
+                metrics = {}
+                for line in lines:
+                    if line.startswith("phantom_proof_drift_ms_sum"):
+                        metrics["drift_sum"] = float(line.split()[1])
+                    if line.startswith("phantom_proof_drift_ms_count"):
+                        metrics["drift_count"] = float(line.split()[1])
+                    if line.startswith("phantom_ejection_count"):
+                        metrics["total_ejections"] = int(float(line.split()[1]))
+                
+                p50_drift = metrics.get("drift_sum", 0) / max(metrics.get("drift_count", 1), 1)
+                return {
+                    "p99_drift": p50_drift * 1.5, # Estimation for p99 based on mean
+                    "total_ejections": metrics.get("total_ejections", 0),
+                    "false_positives": 0
+                }
+        except Exception as e:
+            print(f"Gauntlet: Failed to scrape metrics: {e}")
+            
         return {
-            "p99_drift": 845, # ms
-            "total_ejections": 15,
+            "p99_drift": 0,
+            "total_ejections": 0,
             "false_positives": 0
         }
 

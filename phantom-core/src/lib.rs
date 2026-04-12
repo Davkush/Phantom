@@ -1,4 +1,5 @@
 pub mod packet;
+pub mod constants;
 pub mod builder;
 pub mod processor;
 pub mod dht;
@@ -27,6 +28,11 @@ mod tests {
 
     #[test]
     fn test_sphinx_packet_lifecycle() {
+        use crate::replay_cache::ReplayCache;
+        let mut cache1 = ReplayCache::new(1000, 0.01);
+        let mut cache2 = ReplayCache::new(1000, 0.01);
+        let mut cache3 = ReplayCache::new(1000, 0.01);
+
         // Setup 3 nodes for the circuit: First, Middle, Last
         let node1 = HybridKeyPair::generate();
         let node2 = HybridKeyPair::generate();
@@ -34,10 +40,6 @@ mod tests {
 
         let path = vec![node1.public_key(), node2.public_key(), node3.public_key()];
         
-        let path_str_1 = "node2_ip_addr".to_string();
-        let path_str_2 = "node3_ip_addr".to_string();
-        
-        // Node 1 forwards to Node 2 (stubbed with generic bytes here)
         let action1 = RoutingAction::Forward(crate::packet::NodeId([1u8; 32])); 
         let action2 = RoutingAction::Forward(crate::packet::NodeId([2u8; 32]));
         let action3 = RoutingAction::Deliver;
@@ -51,27 +53,25 @@ mod tests {
         let mut packet = build_packet(&path, &actions, original_payload, c_batch, epoch)
             .expect("Failed to build packet");
             
-        assert_eq!(packet.crypto_headers.len(), 3);
+        // Initial state check
+        assert_eq!(packet.version, 0x02);
+        assert_eq!(packet.epoch, 42);
 
         // Hop 1 (Node 1)
-        let block1 = process_packet(&node1, &mut packet).expect("Node 1 processing failed");
+        let block1 = process_packet(&node1, &mut packet, &mut cache1).expect("Node 1 processing failed");
         assert!(matches!(block1.action, RoutingAction::Forward(_)));
         assert_eq!(block1.c_batch, c_batch);
         assert_eq!(block1.epoch, epoch);
-        assert_eq!(packet.crypto_headers.len(), 2);
 
         // Hop 2 (Node 2)
-        let block2 = process_packet(&node2, &mut packet).expect("Node 2 processing failed");
+        let block2 = process_packet(&node2, &mut packet, &mut cache2).expect("Node 2 processing failed");
         assert!(matches!(block2.action, RoutingAction::Forward(_)));
-        assert_eq!(packet.crypto_headers.len(), 1);
 
         // Hop 3 (Node 3 - Receiver)
-        let block3 = process_packet(&node3, &mut packet).expect("Node 3 processing failed");
+        let block3 = process_packet(&node3, &mut packet, &mut cache3).expect("Node 3 processing failed");
         assert!(matches!(block3.action, RoutingAction::Deliver));
-        assert_eq!(packet.crypto_headers.len(), 0);
 
-        // Check if the final payload matches original
-        assert_eq!(packet.payload, original_payload);
+        // Check if the final payload starts with original
+        assert_eq!(&packet.payload[..original_payload.len()], original_payload);
     }
-}
 

@@ -8,6 +8,9 @@ edition = "2021"
 serde = { version = "1.0", features = ["derive"] }
 x25519-dalek = "=2.0.0"
 pqcrypto-kyber = "=0.8.0"
+pqcrypto-dilithium = "=0.5.0"
+bloomfilter = "1.0"
+plonky2 = "=0.2.2"
 # Security Fixes (Pinned)
 subtle = "=2.5.0"           
 zeroize = "=1.7.0"          

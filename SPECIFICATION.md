@@ -4,9 +4,21 @@
 
 ### 1.1 Post-Quantum Sphinx Packet (9216 bytes)
 The Phantom Sphinx packet is designed to be **Bitwise and Volumetric Indistinguishable** from random noise.
-*   **Packet Size**: Exactly 9216 bytes (9KB) to accommodate the 1568-byte Kyber-1024 ciphertexts.
-*   **Entropy**: All packets, including dummy cover traffic, are padded with ChaCha20-derived high-entropy noise.
-*   **PQ Security**: Every hop performs a full Kyber-1024 decapsulation (PQ-KEM) and Ed25519-to-X25519 blinded scalar multiplication.
+*   **Packet Size**: Exactly 9216 bytes (9KB).
+*   **Entropy**: All packets are padded with high-entropy noise.
+*   **PQ Security**: Every hop performs a full Kyber-1024 decapsulation and X25519 blinded scalar multiplication.
+
+#### 1.1.1 Header Geometry (Approach B - Separated Sidecar)
+Phantom uses a separated KEM sidecar layout to maximize payload:
+
+| Region | Size | Description |
+|---|---|---|
+| Current KEM Block | 1,600 B | Current hop's X25519 Ephemeral PK + Kyber-1024 CT |
+| Routing Info | 68 B | Encrypted RoutingAction + c_batch + Epoch |
+| Per-hop MAC | 32 B | BLAKE3 MAC (Verified PRIOR to KEM decapsulation) |
+| KEM Sidecar | 6,400 B | 4 remaining hops' KEM blocks (onion-encrypted) |
+| **Header Total** | **8,100 B** | Total structure overhead |
+| **Payload** | **1,116 B** | Usable application data |
 
 ### 1.2 STARK Verifiable Shuffling (Plonky2)
 To solve the "Relay Trust" problem, Phantom implements a permutation argument circuit.
