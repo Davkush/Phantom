@@ -39,6 +39,8 @@ lazy_static! {
 pub async fn spawn_metrics_server(port: u16) {
     // 1. Register metrics with the global registry
     let _ = REGISTRY.register(Box::new(ZK_GEN_TIME.clone()));
+    let _ = REGISTRY.register(Box::new(PHANTOM_PROOF_DRIFT_MS.clone()));
+    let _ = REGISTRY.register(Box::new(PHANTOM_EJECTION_COUNT.clone()));
     let _ = REGISTRY.register(Box::new(BATCH_SIZE.clone()));
     let _ = REGISTRY.register(Box::new(DHT_PEERS.clone()));
 
