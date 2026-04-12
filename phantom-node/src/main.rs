@@ -239,6 +239,14 @@ async fn main() -> anyhow::Result<()> {
         transport_wire.listen_loop(mix_tx).await;
     });
 
+    // Task 2.3: Churn Manager initialization
+    let is_running = Arc::new(Mutex::new(true));
+    let node_handle = NodeHandle { is_running: is_running.clone() };
+    let sm_for_churn = stream_manager.clone();
+    let churn_handle = tokio::spawn(async move {
+        run_churn_loop(node_handle, sm_for_churn).await;
+    });
+
     let mix_node_keypair = id_manager.mix_keypair();
     let mix_handle = tokio::spawn(async move {
         // Process packets from both SOCKS5 and the physical wire

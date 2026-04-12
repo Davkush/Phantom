@@ -19,23 +19,35 @@ pub async fn run_cover_loop(
     shaper: &crate::transport::obfuscation::TrafficShaper
 ) {
     let timer = PoissonTimer::new(avg_interval);
+    let mut rng = rand::thread_rng();
     
+    // Task 3.1: Multi-size standard distribution (2KB, 4KB, 9KB)
+    let standard_sizes = vec![2048, 4096, 9216];
+
     loop {
         let delay = timer.next_delay();
         tokio::time::sleep(delay).await;
 
+        use rand::seq::SliceRandom;
+        let target_size = *standard_sizes.choose(&mut rng).unwrap();
+
         // Pull from the priority inbound queue or send decoy
-        let packet = match packet_rx.try_recv() {
+        let mut packet = match packet_rx.try_recv() {
             Ok(p) => p,
-            Err(_) => generate_dummy_sphinx_packet(),
+            Err(_) => generate_dummy_sphinx_packet(target_size),
         };
+
+        // Ensure packet matches the randomized cover size
+        if packet.payload.len() < target_size {
+            packet.payload.resize(target_size, 0u8);
+        }
 
         // Dispatch via QUIC with Traffic Shaping
         let _ = transport.send_packet(target_addr, packet, shaper).await;
     }
 }
 
-fn generate_dummy_sphinx_packet() -> crate::packet::SphinxPacket {
+fn generate_dummy_sphinx_packet(size: usize) -> crate::packet::SphinxPacket {
     crate::packet::SphinxPacket {
         version: 1,
         flags: 0x01, // Drop flag
@@ -46,6 +58,6 @@ fn generate_dummy_sphinx_packet() -> crate::packet::SphinxPacket {
         gamma_mac: [0u8; 32],
         c_batch: [0u8; 16],
         pi_ref: 0,
-        payload: vec![0u8; 1024], // Dummy payload
+        payload: vec![0u8; size], 
     }
 }

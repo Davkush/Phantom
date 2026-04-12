@@ -145,6 +145,10 @@ impl StreamManager {
         }
     }
 
+    pub fn has_active_streams(&self) -> bool {
+        !self.active_tcp_streams.is_empty()
+    }
+
     /// Process a packet arriving from the Exit node via a SURB.
     pub async fn handle_inbound(&mut self, surb_id: [u8; 16], encrypted_payload: Vec<u8>) -> anyhow::Result<()> {
         // 1. Retrieve the pre-stored keys for this specific SURB
