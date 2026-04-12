@@ -3,6 +3,9 @@ use phantom_core::transport::nat::PortMapper;
 use phantom_core::hidden_service::ip::IntroductionHandler;
 use phantom_core::hidden_service::rp::RendezvousSplicer;
 use phantom_core::incentives::reciprocal::ReciprocalTracker;
+use phantom_core::packet::{SphinxPacket, RoutingAction};
+use phantom_core::identity::IdentityManager;
+use phantom_core::mix::run_mix_batch_loop;
 use tokio::sync::mpsc;
 use clap::Parser;
 use std::path::PathBuf;
@@ -191,7 +194,9 @@ async fn main() -> anyhow::Result<()> {
     let _dns_nodes = bootstrap::dns_seeding::DnsBootstrap::query_seeders("seed.phantom-protocol.net").await;
 
     // 5e. Phase 10 & 11: Hidden Service Handlers
-    let ip_handler: Option<Arc<IntroductionHandler>> = None;
+    // MED-05: Initializing IP handler with adaptive PoW defense
+    let (service_tx, mut _service_rx) = mpsc::channel(100);
+    let ip_handler = Arc::new(IntroductionHandler::new(service_tx, 4));
     let rp_splicer = Arc::new(Mutex::new(RendezvousSplicer::new()));
     
     // 5f. Start ZK Proof Monitor (Simulated GossipSub)
@@ -258,7 +263,7 @@ async fn main() -> anyhow::Result<()> {
             proof_tx, 
             batch_size_tx, 
             zk_time_tx,
-            ip_handler,
+            Some(ip_handler.clone()),
             rp_splicer,
             mix_node_keypair
         ).await; 
