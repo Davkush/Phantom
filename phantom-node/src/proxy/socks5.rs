@@ -1,13 +1,23 @@
 use std::collections::{HashMap, BTreeMap};
+use std::net::SocketAddr;
+use tokio::net::{TcpListener, TcpStream};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use phantom_core::packet::{SphinxPacket, PhantomStreamHeader, MAX_HOPS, KYBER_CT_SIZE, PayloadEnvelope, SURB, RoutingAction};
-use phantom_core::builder::SphinxBuilder;
+use phantom_core::builder::{SphinxBuilder, build_packet};
+use phantom_core::routing::guards::GuardManager;
+use phantom_core::routing::path::PathSelector;
+use phantom_core::identity::NodeDescriptor;
 use phantom_crypto::kdf::{derive_key, KdfPurpose};
 use chacha20poly1305::{ChaCha20Poly1305, Key, KeyInit, AeadInPlace};
 use chacha20poly1305::aead::{generic_array::GenericArray};
+use std::sync::Arc;
 
 pub struct Socks5Entry {
     pub listen_addr: SocketAddr,
     pub mix_tx: tokio::sync::mpsc::Sender<SphinxPacket>,
+    pub guards: Vec<NodeDescriptor>,
+    pub middle_nodes: Vec<NodeDescriptor>,
+    pub exit_nodes: Vec<NodeDescriptor>,
 }
 
 impl Socks5Entry {
@@ -23,8 +33,19 @@ impl Socks5Entry {
                 // 1. Handle SOCKS5 Handshake (Version 5, No Auth)
                 if let Ok(target) = handle_socks5_handshake(&mut stream).await {
                     println!("SOCKS5: CONNECT request to {:?}", target);
-                    // 2. Initiate Sphinx Circuit for this stream and pipe data
-                    let _ = pipe_stream_to_mixnet(stream, target, tx).await;
+                    
+                    // GAP-06: Persistent Guard Selection
+                    let path = PathSelector::select_circuit(
+                        &self.guards,
+                        &self.middle_nodes,
+                        &self.exit_nodes
+                    );
+
+                    if let Ok(circuit) = path {
+                        let _ = pipe_stream_to_mixnet(stream, target, tx, circuit).await;
+                    } else {
+                        println!("SOCKS5: Failed to select circuit for stream.");
+                    }
                 }
             });
         }
@@ -74,7 +95,8 @@ async fn handle_socks5_handshake(stream: &mut TcpStream) -> anyhow::Result<Strin
 async fn pipe_stream_to_mixnet(
     mut stream: TcpStream, 
     target: String, 
-    tx: tokio::sync::mpsc::Sender<SphinxPacket>
+    tx: tokio::sync::mpsc::Sender<SphinxPacket>,
+    circuit: Vec<NodeDescriptor>
 ) -> anyhow::Result<()> {
     let stream_id: u64 = rand::random();
     let mut seq_num = 0u64;
@@ -82,8 +104,16 @@ async fn pipe_stream_to_mixnet(
     let mut buf = vec![0u8; chunk_size];
     
     // Simulate pre-existing SURB bundle (Phase 7 logic)
-    let surb_bundle = Vec::new(); // In a real flow, this would be periodically replenished
+    let surb_bundle = Vec::new(); 
     
+    // Prepare Circuit Data
+    let path_keys: Vec<_> = circuit.iter().map(|n| n.hybrid_pk()).collect();
+    let actions = vec![
+        RoutingAction::Forward(circuit[1].node_id.into()),
+        RoutingAction::Forward(circuit[2].node_id.into()),
+        RoutingAction::Deliver,
+    ];
+
     while let Ok(n) = stream.read(&mut buf).await {
         if n == 0 { break; }
         
@@ -97,7 +127,6 @@ async fn pipe_stream_to_mixnet(
             surb_id: None,
         };
         
-        // 1. PHASE 07: PayloadEnvelope Serialization
         let envelope = PayloadEnvelope {
             stream_header: header,
             data: buf[..n].to_vec(),
@@ -105,23 +134,14 @@ async fn pipe_stream_to_mixnet(
         };
         
         let payload = bincode::serialize(&envelope)?;
+        let c_batch: [u8; 16] = rand::random();
+        let epoch = 0; // Current protocol epoch
+
+        // PHASE 05 Hardening: Construct Real Sphinx Packet with persistent Entry Guard
+        let packet = build_packet(&path_keys, &actions, &payload, c_batch, epoch)
+            .map_err(|e| anyhow::anyhow!("Sphinx construction failed: {}", e))?;
         
-        println!("SOCKS5: Tunneling chunk {} (incl. {} SURBs) to mixnet...", seq_num, surb_bundle.len());
-        
-        let dummy_pkt = SphinxPacket {
-            version: 1,
-            flags: 0,
-            epoch: 0,
-            alpha_cl: [0u8; 32],
-            alpha_pq_onion: vec![0u8; MAX_HOPS * KYBER_CT_SIZE],
-            beta_routing: [0u8; 128],
-            gamma_mac: [0u8; 32],
-            c_batch: [0u8; 16],
-            pi_ref: 0,
-            payload,
-        };
-        
-        tx.send(dummy_pkt).await?;
+        tx.send(packet).await?;
         seq_num += 1;
     }
     Ok(())

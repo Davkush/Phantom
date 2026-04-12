@@ -110,10 +110,20 @@ async fn main() -> anyhow::Result<()> {
     let ip_handler = Arc::new(IntroductionHandler::new(service_tx, 4));
     let rp_splicer = Arc::new(Mutex::new(RendezvousSplicer::new()));
     let reciprocal_tracker = Arc::new(ReciprocalTracker::new());
+    
+    // GAP-06: Guard Management
+    let guard_manager = Arc::new(phantom_core::routing::guards::GuardManager::new(args.config_dir.clone()));
 
     // Start Global Telemetry & TUI
     tokio::spawn(metrics::spawn_metrics_server(9091));
-    let sentinel_handle = tokio::spawn(sentinel::tui::run_swarm_monitor());
+    let _sentinel_handle = tokio::spawn(sentinel::tui::run_swarm_monitor());
+
+    // 5d. Phase 11: DNS Seeding (Bootstrap)
+    let dns_nodes = bootstrap::dns_seeding::DnsBootstrap::query_seeders("seed.phantom-protocol.net").await;
+    
+    // Select Persistent Guards from discovered nodes
+    let guards = guard_manager.get_or_select_guards(&dns_nodes)
+        .unwrap_or_else(|_| dns_nodes.clone()); 
 
     loop {
         let session_token = CancellationToken::new();
@@ -164,10 +174,13 @@ async fn main() -> anyhow::Result<()> {
             session_token_churn.cancel();
         });
 
-        // Session Task 5: SOCKS5 Proxy
+        // Session Task 5: SOCKS5 Proxy with Guard Support
         let socks_proxy = Socks5Entry {
             listen_addr: SocketAddr::from(([127, 0, 0, 1], cfg.socks_port)),
             mix_tx: mix_tx.clone(),
+            guards: guards.clone(),
+            middle_nodes: dns_nodes.clone(), // In production, these come from DHT
+            exit_nodes: dns_nodes.clone(),   // In production, these come from DHT
         };
         let socks_handle = tokio::spawn(async move {
             let _ = socks_proxy.run_loop().await;

@@ -18,6 +18,7 @@ pub mod mix;
 pub mod sentinel;
 pub mod zk;
 pub mod incentives;
+pub mod routing;
 
 #[cfg(test)]
 mod tests {
