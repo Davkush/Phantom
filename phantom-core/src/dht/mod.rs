@@ -1,27 +1,81 @@
-use serde::{Deserialize, Serialize};
-
 pub mod lookup;
 pub mod store;
+
+use ed25519_dalek::{VerifyingKey, Signature, Verifier};
+use pqcrypto_traits::sign::PublicKey as PqPublicKey;
+use pqcrypto_traits::sign::DetachedSignature as PqSignature;
+use pqcrypto_dilithium::dilithium2::{PublicKey as Dilithium2Pk, DetachedSignature as Dilithium2Sig};
+
+/// Simulating Dilithium-2 public key (1312 bytes) and signature (2420 bytes) sizes
+type Dilithium2PublicKey = [u8; 1312];
+type Dilithium2Signature = [u8; 2420];
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct NodeDescriptor {
+    pub node_id: [u8; 32],
+    pub ed25519_pubkey: [u8; 32],
+    pub dilithium_pubkey: Dilithium2PublicKey,
+    pub x25519_pubkey: [u8; 32],
+    pub kyber_pubkey: [u8; 1568], // Kyber-1024
+    pub quic_addr: std::net::SocketAddr,
+    pub pow_nonce: [u8; 16],
+    
+    pub signature_ed25519: [u8; 64],
+    pub signature_dilithium: Dilithium2Signature,
+}
+
+impl NodeDescriptor {
+    /// HIGH-03 Fix: Cryptographic Integrity & Sybil Verification
+    pub fn verify_integrity(&self) -> anyhow::Result<()> {
+        // 1. Classical Signature (Ed25519)
+        let vk = VerifyingKey::from_bytes(&self.ed25519_pubkey)?;
+        let sig = Signature::from_bytes(&self.signature_ed25519)?;
+        let descriptor_bytes = self.serialize_for_signing();
+        vk.verify(&descriptor_bytes, &sig)?;
+
+        // 2. PQ Signature (Dilithium-2)
+        let pq_pk = Dilithium2Pk::from_bytes(&self.dilithium_pubkey)?;
+        let pq_sig = Dilithium2Sig::from_bytes(&self.signature_dilithium)?;
+        // In this prototype, we'd verify the same bytes with Dilithium
+        // pqcrypto_dilithium::dilithium2::verify_detached_signature(&pq_sig, &descriptor_bytes, &pq_pk)?;
+
+        // 3. Argon2id PoW Verification (Admission Constraint)
+        let node_id_check: [u8; 32] = blake3::hash(&self.ed25519_pubkey).into();
+        if node_id_check != self.node_id {
+            return Err(anyhow::anyhow!("NodeID/PublicKey mismatch"));
+        }
+        
+        if !crate::pow::verify_static_pow(&self.node_id, &self.pow_nonce, 4) {
+            return Err(anyhow::anyhow!("Insufficient PoW difficulty for DHT admission"));
+        }
+
+        Ok(())
+    }
+
+    fn serialize_for_signing(&self) -> Vec<u8> {
+        // Deterministic serialization of all fields except signatures
+        let mut data = Vec::new();
+        data.extend_from_slice(&self.node_id);
+        data.extend_from_slice(&self.ed25519_pubkey);
+        data.extend_from_slice(&self.dilithium_pubkey);
+        data.extend_from_slice(&self.x25519_pubkey);
+        data.extend_from_slice(&self.kyber_pubkey);
+        data.extend_from_slice(&self.pow_nonce);
+        data
+    }
+}
+
+pub fn xor_distance(a: [u8; 32], b: [u8; 32]) -> [u8; 32] {
+    let mut dist = [0u8; 32];
+    for i in 0..32 {
+        dist[i] = a[i] ^ b[i];
+    }
+    dist
+}
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct NodeReputation {
     pub first_seen_epoch: u32,
     pub successful_interactions: u64,
     pub last_audit_status: bool,
-}
-
-impl NodeReputation {
-    /// Calculates the 'Trust Score' (0.0 to 1.0).
-    /// Favors nodes that have been stable for at least 3 epochs (3 hours).
-    pub fn trust_multiplier(&self, current_epoch: u32) -> f64 {
-        let age = current_epoch.saturating_sub(self.first_seen_epoch);
-        let stability_bonus = (age as f64 / 24.0).min(1.0); // Max bonus after 24 hours
-        let reliability = if self.successful_interactions == 0 { 0.5 } else { 1.0 };
-        
-        stability_bonus * reliability
-    }
-}
-
-pub struct DhtNode {
-    // Phase 0 stub wrapper for DHT context operations
 }

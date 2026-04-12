@@ -12,24 +12,7 @@ use argon2::{
 use std::time::{Instant, Duration};
 use std::collections::HashMap;
 
-/// Simulating Dilithium-2 public key (1312 bytes) and signature (2420 bytes) sizes
-/// Addressing MED-06: Downgraded from Dilithium-3 to Dilithium-2 for Descriptor size reduction.
-type Dilithium2PublicKey = [u8; 1312];
-type Dilithium2Signature = [u8; 2420];
-
-/// Node Descriptor
-/// Addressing MED-06: The Dilithium signature is sized for Dilithium-2 (Level 2).
-#[derive(Clone, Serialize, Deserialize)]
-pub struct NodeDescriptor {
-    pub ed25519_pubkey: [u8; 32],
-    pub dilithium_pubkey: Dilithium2PublicKey,
-    pub x25519_pubkey: [u8; 32],
-    pub kyber_pubkey: [u8; 1184], // Kyber-1024
-    pub quic_addr: std::net::SocketAddr, // Added for Phase 7 SURB first-hop routing
-    
-    pub signature_ed25519: [u8; 64],
-    pub signature_dilithium: Dilithium2Signature,
-}
+use crate::dht::NodeDescriptor;
 
 /// Argon2id parameters for Sybil resistance (CRIT-03/HIGH-01)
 const ARGON2_T: u32 = 3;
@@ -40,6 +23,7 @@ pub struct IdentityManager {
     // Zeroizing ensures the private key is wiped from memory when dropped
     signing_key: Zeroizing<SigningKey>,
     pub node_id: [u8; 32],
+    pub pow_nonce: [u8; 16],
     
     // MED-03 fixation: Burst detection / Rate limiting state
     burst_cache: HashMap<[u8; 16], (Instant, u32)>, 
@@ -48,27 +32,38 @@ pub struct IdentityManager {
 impl IdentityManager {
     /// Loads an identity from a JSON file or generates a new one if it doesn't exist.
     pub fn load_or_generate<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
-        let signing_key = if path.as_ref().exists() {
+        let (signing_key, pow_nonce) = if path.as_ref().exists() {
             let data = fs::read(path)?;
             let mut seed = [0u8; 32];
-            if data.len() >= 32 {
+            let mut nonce = [0u8; 16];
+            if data.len() >= 48 {
                 seed.copy_from_slice(&data[..32]);
+                nonce.copy_from_slice(&data[32..48]);
             }
-            SigningKey::from_bytes(&seed)
+            (SigningKey::from_bytes(&seed), nonce)
         } else {
             let mut csprng = OsRng;
             let key = SigningKey::generate(&mut csprng);
+            let node_id: [u8; 32] = blake3::hash(key.verifying_key().as_bytes()).into();
+            
+            // Solve initial PoW admission challenge
+            let nonce = crate::pow::solve_static_pow(&node_id, 4).unwrap_or([0u8; 16]);
+
             if let Some(parent) = path.as_ref().parent() {
                 fs::create_dir_all(parent)?;
             }
-            fs::write(path, key.to_bytes())?;
-            key
+            let mut buffer = Vec::new();
+            buffer.extend_from_slice(&key.to_bytes());
+            buffer.extend_from_slice(&nonce);
+            fs::write(path, buffer)?;
+            (key, nonce)
         };
 
         let node_id = blake3::hash(signing_key.verifying_key().as_bytes()).into();
         Ok(Self { 
             signing_key: Zeroizing::new(signing_key), 
             node_id,
+            pow_nonce,
             burst_cache: HashMap::new(),
         })
     }

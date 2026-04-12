@@ -1,37 +1,39 @@
-use super::DhtNode;
-
-// Minimal structurally-sound structs for Phase 0 compilation
-#[derive(Clone, Debug, PartialEq)]
-pub struct NodeDescriptor {
-    pub node_id: [u8; 32],
-}
+use super::{NodeDescriptor, xor_distance};
 
 #[derive(Debug)]
 pub enum DhtError {
     InsufficientReplication,
+    NetworkError,
 }
 
-const RADIUS_FACTOR: usize = 2; // Phase 0 density region definition stub
+pub struct DhtNode {
+    pub local_id: [u8; 32],
+    pub known_peers: Vec<NodeDescriptor>,
+}
 
 impl DhtNode {
-    /// SR-DHT-Store: Regional Publication
-    pub async fn sr_dht_store_descriptor(&self, descriptor: NodeDescriptor) -> Result<(), DhtError> {
-        // 1. Calculate the 'Target Region'
-        // Instead of k nodes, we target a keyspace radius defined by the current network density
-        let target_region = self.calculate_keyspace_radius(RADIUS_FACTOR);
+    pub fn new(local_id: [u8; 32]) -> Self {
+        Self { local_id, known_peers: Vec::new() }
+    }
 
-        // 2. Multi-path disjoint publication
-        // We send the STORE_DESC RPC to 5 disjoint paths in the keyspace
-        let publication_paths = self.get_disjoint_paths(descriptor.node_id, 5);
+    /// SR-DHT-Store: Regional Publication (HIGH-03)
+    /// Instead of k-closest nodes, we store in a region defined by keyspace density.
+    pub async fn sr_dht_store_descriptor(&self, descriptor: NodeDescriptor) -> Result<(), DhtError> {
+        // 1. Calculate the 'Target Radius' for a ~20-node replication factor
+        let radius = self.calculate_keyspace_radius();
+
+        // 2. Multi-path disjoint publication (d=5)
+        let publication_seeds = self.get_disjoint_paths(descriptor.node_id, 5);
         
         let mut successes = 0;
-        for path in publication_paths {
-            if self.publish_to_path(path, &descriptor).await.is_ok() {
+        for seed_id in publication_seeds {
+            // In a real network, we'd find nodes near seed_id and publish
+            if self.publish_to_region(seed_id, radius, &descriptor).await.is_ok() {
                 successes += 1;
             }
         }
 
-        // 3. Threshold enforcement
+        // 3. Threshold enforcement (Quorum=3)
         if successes < 3 {
             return Err(DhtError::InsufficientReplication);
         }
@@ -39,8 +41,30 @@ impl DhtNode {
         Ok(())
     }
 
-    // --- Phase 0 Sub-routine Stubs ---
-    fn calculate_keyspace_radius(&self, _factor: usize) -> usize { 0 }
-    fn get_disjoint_paths(&self, _node_id: [u8; 32], paths: usize) -> Vec<usize> { vec![0; paths] }
-    async fn publish_to_path(&self, _path: usize, _desc: &NodeDescriptor) -> Result<(), ()> { Ok(()) }
+    /// Calculates the XOR distance threshold for regional storage.
+    /// Phase 1: Fixed conservative estimate (Targeting ~2% of keyspace).
+    fn calculate_keyspace_radius(&self) -> [u8; 32] {
+        let mut radius = [0xFFu8; 32];
+        // Set the most significant 8 bits to 0 to constrain the region (1/256th of keyspace)
+        radius[0] = 0x00;
+        radius
+    }
+
+    /// Finds 'seeds' for multi-path publication that are maximally disjoint.
+    fn get_disjoint_paths(&self, target_id: [u8; 32], count: usize) -> Vec<[u8; 32]> {
+        let mut seeds = Vec::new();
+        for i in 0..count {
+            let mut seed = target_id;
+            // Shift the seed into different "quadrants" of the keyspace
+            seed[0] ^= (i as u8) << 5; 
+            seeds.push(seed);
+        }
+        seeds
+    }
+
+    async fn publish_to_region(&self, _seed: [u8; 32], _radius: [u8; 32], _desc: &NodeDescriptor) -> Result<(), ()> {
+        // Phase 1 Network Stub
+        println!("DHT: Publishing descriptor to region around {:x?}...", &_seed[0..4]);
+        Ok(())
+    }
 }

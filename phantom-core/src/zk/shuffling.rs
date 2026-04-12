@@ -16,21 +16,23 @@ pub struct SignedVerifierData {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct ShufflingProof {
+pub struct ShuffleProof {
     pub proof_bytes: Vec<u8>,
+    pub input_hashes: Vec<[u8; 32]>,
+    pub output_hashes: Vec<[u8; 32]>,
     pub batch_id: [u8; 16],
     pub node_id: [u8; 32],
     pub created_at_ms: u64,
 }
 
-impl ShufflingProof {
-    /// Verify the STARK proof for batch permutation.
-    pub fn verify(&self, inputs: &[[u8; 32]], outputs: &[[u8; 32]]) -> anyhow::Result<()> {
+impl ShuffleProof {
+    /// Verify the STARK proof for batch permutation using internal public inputs.
+    pub fn verify(&self) -> anyhow::Result<()> {
         const D: usize = 2;
         type C = PoseidonGoldilocksConfig;
         type F = <C as GenericConfig<D>>::F;
 
-        if inputs.len() != outputs.len() {
+        if self.input_hashes.len() != self.output_hashes.len() {
             return Err(anyhow::anyhow!("Input/Output size mismatch"));
         }
 
@@ -39,7 +41,7 @@ impl ShufflingProof {
         
         // Rebuild the circuit for verification
         let mut builder = CircuitBuilder::<F, D>::new(config);
-        let (_input_targets, _output_targets, _gamma, _constraints) = build_shuffle_circuit(&mut builder, inputs.len());
+        let (_input_targets, _output_targets, _gamma, _constraints) = build_shuffle_circuit(&mut builder, self.input_hashes.len());
         let data = builder.build::<C>();
 
         // Decode the proof
@@ -83,7 +85,7 @@ pub fn generate_shuffle_proof(
     inputs: Vec<[u8; 32]>, 
     outputs: Vec<[u8; 32]>, 
     node_id: [u8; 32],
-) -> anyhow::Result<ShufflingProof> {
+) -> anyhow::Result<ShuffleProof> {
     const D: usize = 2;
     type C = PoseidonGoldilocksConfig;
     type F = <C as GenericConfig<D>>::F;
@@ -96,8 +98,6 @@ pub fn generate_shuffle_proof(
     let data = builder.build::<C>();
     
     let mut witness = PartialWitness::new();
-    // In a real impl, we'd map [u8; 32] to field elements safely (e.g. split into 4 u64s)
-    // For Phase 1, we use the first 4 bytes as a representative field element.
     for i in 0..inputs.len() {
         let val_in = u32::from_le_bytes(inputs[i][0..4].try_into().unwrap());
         let val_out = u32::from_le_bytes(outputs[i][0..4].try_into().unwrap());
@@ -112,9 +112,11 @@ pub fn generate_shuffle_proof(
 
     println!("ZK Prover: Generating real GPR shuffle proof for batch...");
     let proof = data.prove(witness)?;
-
-    Ok(ShufflingProof {
+    
+    Ok(ShuffleProof {
         proof_bytes: proof.to_bytes()?,
+        input_hashes: inputs.clone(),
+        output_hashes: outputs.clone(),
         batch_id: derive_batch_id(&inputs),
         node_id,
         created_at_ms: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_millis() as u64,

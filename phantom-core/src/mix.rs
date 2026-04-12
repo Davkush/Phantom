@@ -1,10 +1,13 @@
-use crate::packet::{SphinxPacket, ShufflingProof, RoutingAction};
+use crate::packet::{SphinxPacket, RoutingAction};
 use crate::processor::process_packet;
-use crate::zk::shuffling::generate_shuffle_proof;
+use crate::zk::shuffling::{ShuffleProof, generate_shuffle_proof};
 use crate::hybrid_kem::HybridKeyPair;
 use crate::replay_cache::ReplayCache;
 use tokio::sync::mpsc::{Receiver, Sender};
 use rand::seq::SliceRandom;
+use std::time::Duration;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 /// CRIT-02: STARK-based verifiable shuffling and batching.
 /// MED-01: Jittered publication to prevent timing correlation.
@@ -13,7 +16,7 @@ pub async fn run_mix_batch_loop(
     out_tx: Sender<SphinxPacket>,
     exit_tx: Sender<SphinxPacket>,
     return_tx: Sender<SphinxPacket>,
-    proof_tx: Sender<ShufflingProof>,
+    proof_tx: Sender<ShuffleProof>,
     batch_size_tx: Sender<usize>,
     zk_time_tx: Sender<Duration>,
     ip_handler: Option<Arc<IntroductionHandler>>,
