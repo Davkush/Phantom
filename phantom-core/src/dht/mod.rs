@@ -2,9 +2,9 @@ pub mod lookup;
 pub mod store;
 
 use ed25519_dalek::{VerifyingKey, Signature, Verifier};
-use pqcrypto_traits::sign::PublicKey as PqPublicKey;
-use pqcrypto_traits::sign::DetachedSignature as PqSignature;
 use pqcrypto_dilithium::dilithium2::{PublicKey as Dilithium2Pk, DetachedSignature as Dilithium2Sig};
+use crate::hybrid_kem::HybridPublicKey;
+use serde::{Serialize, Deserialize};
 
 /// Simulating Dilithium-2 public key (1312 bytes) and signature (2420 bytes) sizes
 type Dilithium2PublicKey = [u8; 1312];
@@ -62,6 +62,14 @@ impl NodeDescriptor {
         data.extend_from_slice(&self.kyber_pubkey);
         data.extend_from_slice(&self.pow_nonce);
         data
+    }
+
+    /// Helper to convert descriptor keys into a HybridPublicKey for Sphinx encryption.
+    pub fn hybrid_pk(&self) -> HybridPublicKey {
+        HybridPublicKey {
+            x25519_pub: self.x25519_pubkey,
+            kyber_pub: self.kyber_pubkey,
+        }
     }
 }
 

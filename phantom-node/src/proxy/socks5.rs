@@ -109,8 +109,8 @@ async fn pipe_stream_to_mixnet(
     // Prepare Circuit Data
     let path_keys: Vec<_> = circuit.iter().map(|n| n.hybrid_pk()).collect();
     let actions = vec![
-        RoutingAction::Forward(circuit[1].node_id.into()),
-        RoutingAction::Forward(circuit[2].node_id.into()),
+        RoutingAction::Forward(phantom_core::packet::NodeId(circuit[1].node_id)),
+        RoutingAction::Forward(phantom_core::packet::NodeId(circuit[2].node_id)),
         RoutingAction::Deliver,
     ];
 

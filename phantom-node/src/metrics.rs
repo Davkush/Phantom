@@ -1,4 +1,4 @@
-use prometheus::{Encoder, TextEncoder, Registry, Gauge, Histogram, histogram_opts};
+use prometheus::{Encoder, TextEncoder, Registry, Gauge, Histogram, Counter, register_counter, register_histogram, histogram_opts};
 use lazy_static::lazy_static;
 use warp::Filter;
 
