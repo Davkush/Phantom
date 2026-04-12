@@ -79,22 +79,30 @@ impl IPhantomTransport for QuicTransport {
     }
 
     /// Listens for incoming QUIC streams and injects them into the Mix Processor.
-    async fn listen_loop(&self, tx: tokio::sync::mpsc::Sender<SphinxPacket>) {
-        while let Some(conn) = self.endpoint.accept().await {
-            let tx = tx.clone();
-            tokio::spawn(async move {
-                let connection = conn.await.ok()?;
-                while let Ok(mut stream) = connection.accept_uni().await {
-                    // Force 9KB buffer
-                    let mut buf = vec![0u8; crate::packet::PACKET_SIZE];
-                    if stream.read_exact(&mut buf).await.is_ok() {
-                        if let Ok(pkt) = SphinxPacket::deserialize(&buf) {
-                            let _ = tx.send(pkt).await;
-                        }
-                    }
+    async fn listen_loop(&self, tx: tokio::sync::mpsc::Sender<SphinxPacket>, token: tokio_util::sync::CancellationToken) {
+        loop {
+            tokio::select! {
+                _ = token.cancelled() => {
+                    println!("QuicTransport: Shutdown signal received. Stopping listener.");
+                    break;
                 }
-                Some(())
-            });
+                Some(conn) = self.endpoint.accept() => {
+                    let tx = tx.clone();
+                    tokio::spawn(async move {
+                        let connection = conn.await.ok()?;
+                        while let Ok(mut stream) = connection.accept_uni().await {
+                            // Force 9KB buffer
+                            let mut buf = vec![0u8; crate::packet::PACKET_SIZE];
+                            if stream.read_exact(&mut buf).await.is_ok() {
+                                if let Ok(pkt) = SphinxPacket::deserialize(&buf) {
+                                    let _ = tx.send(pkt).await;
+                                }
+                            }
+                        }
+                        Some(())
+                    });
+                }
+            }
         }
     }
 

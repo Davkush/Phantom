@@ -24,6 +24,7 @@ pub async fn run_mix_batch_loop(
     reciprocal_tracker: Arc<ReciprocalTracker>,
     node_keypair: HybridKeyPair,
     replay_cache: Arc<Mutex<ReplayCache>>, // HIGH-05: Replay protection
+    token: tokio_util::sync::CancellationToken,
 ) {
     println!("Mix Processor: Batch loop active. Waiting for 9KB Sphinx packets...");
     
@@ -35,18 +36,22 @@ pub async fn run_mix_batch_loop(
         let jitter = rng.gen_range(650..750);
         let timeout = Duration::from_millis(jitter);
 
-        let result = tokio::time::timeout(timeout, rx.recv()).await;
-
-        match result {
-            Ok(Some(pkt)) => {
-                println!("Mix Processor: Received packet (epoch {}). Queuing for batch.", pkt.epoch);
-                batch.push(pkt);
-            },
-            Ok(None) => break, // Channel closed
-            Err(_) => {
-                // Timeout reached, process the batch
-                if !batch.is_empty() {
-                    println!("Mix Processor: Batch interval reached. Shuffling and processing {} packets...", batch.len());
+        tokio::select! {
+            _ = token.cancelled() => {
+                println!("Mix Processor: Shutdown signal received. Exiting loop.");
+                break;
+            }
+            result = tokio::time::timeout(timeout, rx.recv()) => {
+                match result {
+                    Ok(Some(pkt)) => {
+                        println!("Mix Processor: Received packet (epoch {}). Queuing for batch.", pkt.epoch);
+                        batch.push(pkt);
+                    },
+                    Ok(None) => break, // Channel closed
+                    Err(_) => {
+                        // Timeout reached, process the batch
+                        if !batch.is_empty() {
+                            println!("Mix Processor: Batch interval reached. Shuffling and processing {} packets...", batch.len());
                     
                     // 1. Shuffling (Real random permutation)
                     batch.shuffle(&mut rng);

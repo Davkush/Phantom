@@ -17,7 +17,7 @@ pub trait PhantomTransport: Send + Sync {
     async fn send_packet(&self, target_addr: SocketAddr, packet: SphinxPacket, shaper: &crate::transport::obfuscation::TrafficShaper) -> anyhow::Result<()>;
     
     /// Listens for incoming streams and injects them into the Mix Processor.
-    async fn listen_loop(&self, tx: Sender<SphinxPacket>);
+    async fn listen_loop(&self, tx: Sender<SphinxPacket>, token: tokio_util::sync::CancellationToken);
     
     /// Returns the local address of the transport endpoint.
     fn local_addr(&self) -> anyhow::Result<SocketAddr>;

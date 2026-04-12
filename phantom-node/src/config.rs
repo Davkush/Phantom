@@ -9,6 +9,7 @@ pub struct PhantomConfig {
     pub config_dir: String,
     pub bootstrap_addr: Option<String>,
     pub adversarial_mode: bool,
+    pub variable_uptime_hours: u32,
 }
 
 impl PhantomConfig {
@@ -19,7 +20,8 @@ impl PhantomConfig {
         s = s.set_default("port", 443)?
              .set_default("socks_port", 9050)?
              .set_default("config_dir", config_dir)?
-             .set_default("adversarial_mode", false)?;
+             .set_default("adversarial_mode", false)?
+             .set_default("variable_uptime_hours", 12)?;
 
         // 2. Local Config File (phantom.toml) - High Precedence
         let config_file = format!("{}/phantom.toml", config_dir);
