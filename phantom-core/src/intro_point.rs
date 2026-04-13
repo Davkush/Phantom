@@ -30,6 +30,7 @@ impl IntroPointState {
     }
 
     /// Address MED-05: Dynamic intra-epoch PoW difficulty adjustment.
+    /// Tracks request density in 60-second windows.
     pub fn record_request(&mut self) {
         let now = Instant::now();
         if now.duration_since(self.last_window_reset) > Duration::from_secs(60) {
@@ -40,11 +41,15 @@ impl IntroPointState {
         }
     }
 
+    /// MED-05 Hardening: Active DoS throttling curve.
+    /// Scales exponentially beyond the 1k-hit threshold.
     pub fn get_dynamic_difficulty(&self) -> u32 {
-        if self.window_hits > 10000 {
-            self.base_pow_difficulty + 8
+        if self.window_hits > 20000 {
+            self.base_pow_difficulty + 16 // Significant barrier for botnets
+        } else if self.window_hits > 10000 {
+            self.base_pow_difficulty + 10
         } else if self.window_hits > 5000 {
-            self.base_pow_difficulty + 4
+            self.base_pow_difficulty + 6
         } else if self.window_hits > 1000 {
             self.base_pow_difficulty + 2
         } else {

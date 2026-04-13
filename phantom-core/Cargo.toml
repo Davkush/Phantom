@@ -19,7 +19,7 @@ tiny-keccak = { version = "=2.0.2", features = ["shake"] }
 base32 = "0.4"
 quinn = "0.10"
 rustls = { version = "0.21", features = ["dangerous_configuration", "quic"] }
-rcgen = "0.11"
+rcgen = "=0.11.3"
 rustls-pemfile = "1.0"
 rustls-native-certs = "0.6"
 ed25519-dalek = { version = "2.1", features = ["serde", "pkcs8"] }
@@ -27,7 +27,7 @@ zeroize = { version = "1.7", features = ["derive"] }
 tokio-util = { version = "0.7", features = ["codec"] }
 tokio-stream = "0.1"
 futures-util = "0.3"
-igd = { version = "0.12", features = ["aio"] }
+igd = "=0.12.1"
 argon2 = "0.5"
 password-hash = "0.5"
 async-trait = "0.1"

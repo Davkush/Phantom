@@ -5,7 +5,7 @@ use plonky2::plonk::circuit_builder::CircuitBuilder;
 use plonky2::plonk::circuit_data::{CircuitConfig, CircuitData};
 use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
 use plonky2::plonk::proof::ProofWithPublicInputs;
-use crate::zk::constants::{PHANTOM_FRI_CONFIG, MIN_BATCH_SIZE};
+use crate::zk::constants::{default_fri_config, MIN_BATCH_SIZE};
 use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -31,7 +31,7 @@ impl ShuffleProof {
         }
 
         let mut config = CircuitConfig::standard_recursion_config();
-        config.fri_config = PHANTOM_FRI_CONFIG;
+        config.fri_config = default_fri_config();
         
         let mut builder = CircuitBuilder::<F, D>::new(config);
         let (input_targets, output_targets, _gamma, _constraints) = build_shuffle_circuit(&mut builder, expected_inputs.len());
@@ -107,7 +107,7 @@ pub fn generate_shuffle_proof(
     type F = <C as GenericConfig<D>>::F;
 
     let mut config = CircuitConfig::standard_recursion_config();
-    config.fri_config = PHANTOM_FRI_CONFIG;
+    config.fri_config = default_fri_config();
     
     let mut builder = CircuitBuilder::<F, D>::new(config);
     let (input_targets, output_targets, gamma, constraints) = build_shuffle_circuit(&mut builder, inputs.len());
