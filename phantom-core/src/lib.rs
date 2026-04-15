@@ -19,6 +19,8 @@ pub mod sentinel;
 pub mod zk;
 pub mod incentives;
 pub mod routing;
+pub mod hybrid_kem;
+pub mod kdf;
 
 #[cfg(test)]
 mod tests {
