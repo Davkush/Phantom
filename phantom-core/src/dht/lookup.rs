@@ -133,6 +133,7 @@ mod tests {
             kyber_pubkey: [0u8; 1568],
             quic_addr: "127.0.0.1:443".parse().unwrap(),
             pow_nonce: [0u8; 16],
+            uptime_schedule: super::UptimeSchedule::default(),
             signature_ed25519: [0u8; 64],
             signature_dilithium: [0u8; 2420],
         }

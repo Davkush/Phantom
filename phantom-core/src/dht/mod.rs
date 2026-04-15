@@ -10,6 +10,54 @@ use serde::{Serialize, Deserialize};
 type Dilithium2PublicKey = [u8; 1312];
 type Dilithium2Signature = [u8; 2420];
 
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+pub struct UptimeSchedule {
+    /// 24-bit field representing the 24 hours of a UTC day.
+    /// Bit N (where N is 0-23) = 1 means Online during hour N, 0 means Offline.
+    pub daily_bitfield: u32,
+}
+
+impl UptimeSchedule {
+    pub fn is_online_at(&self, timestamp_ms: u64) -> bool {
+        let seconds = timestamp_ms / 1000;
+        let hours_since_epoch = seconds / 3600;
+        let hour_of_day = (hours_since_epoch % 24) as u32;
+        
+        (self.daily_bitfield & (1 << hour_of_day)) != 0
+    }
+
+    /// Generates a deterministic uptime bitfield based on a static node parameter.
+    pub fn generate_deterministic(seed: [u8; 32], target_uptime_hours: u32) -> Self {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(&seed);
+        hasher.update(b"UPTIME_SCHEDULE");
+        let hash_bytes = hasher.finalize();
+        
+        let mut bitfield: u32 = 0;
+        let mut hours_assigned = 0;
+        
+        for i in 0..32 {
+            if hours_assigned >= target_uptime_hours { break; }
+            let hour = hash_bytes.as_bytes()[i] as u32 % 24;
+            if (bitfield & (1 << hour)) == 0 {
+                bitfield |= 1 << hour;
+                hours_assigned += 1;
+            }
+        }
+        
+        // Fallback for duplicates
+        for hour in 0..24 {
+            if hours_assigned >= target_uptime_hours { break; }
+            if (bitfield & (1 << hour)) == 0 {
+                bitfield |= 1 << hour;
+                hours_assigned += 1;
+            }
+        }
+        
+        Self { daily_bitfield: bitfield }
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct NodeDescriptor {
     pub node_id: [u8; 32],
@@ -19,6 +67,7 @@ pub struct NodeDescriptor {
     pub kyber_pubkey: [u8; 1568], // Kyber-1024
     pub quic_addr: std::net::SocketAddr,
     pub pow_nonce: [u8; 16],
+    pub uptime_schedule: UptimeSchedule,
     
     pub signature_ed25519: [u8; 64],
     pub signature_dilithium: Dilithium2Signature,
@@ -61,6 +110,7 @@ impl NodeDescriptor {
         data.extend_from_slice(&self.x25519_pubkey);
         data.extend_from_slice(&self.kyber_pubkey);
         data.extend_from_slice(&self.pow_nonce);
+        data.extend_from_slice(&self.uptime_schedule.daily_bitfield.to_le_bytes());
         data
     }
 
