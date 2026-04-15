@@ -59,10 +59,13 @@ impl DnsBootstrap {
         // 3. Construct Minimal Descriptor for initial contact
         // Full keys (Kyber/Dilithium) are pulled from the DHT once connected to the seed.
         Some(NodeDescriptor {
+            node_id: [0u8; 32],
+            pow_nonce: [0u8; 16],
+            uptime_schedule: phantom_core::dht::UptimeSchedule::default(),
             ed25519_pubkey: pubkey_bytes,
             dilithium_pubkey: [0u8; 1312], 
             x25519_pubkey: [0u8; 32],
-            kyber_pubkey: [0u8; 1184],
+            kyber_pubkey: [0u8; 1568],
             quic_addr: addr,
             signature_ed25519: [0u8; 64],
             signature_dilithium: [0u8; 2420],

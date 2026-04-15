@@ -1,6 +1,6 @@
 # Phase 9: Network Orchestration & Reproducible Environment
 # Stage 1: Build
-FROM rust:1.75-slim-bookworm as builder
+FROM rust:slim-bookworm as builder
 
 # Install build dependencies for Plonky2 (clang, cmake) and OpenSSL
 RUN apt-get update && apt-get install -y \
