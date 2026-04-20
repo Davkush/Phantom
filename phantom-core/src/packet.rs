@@ -1,5 +1,5 @@
 use crate::constants::*;
-use phantom_crypto::hybrid_kem::{HybridCiphertext, HybridPublicKey};
+use crate::hybrid_kem::{HybridCiphertext, HybridPublicKey};
 use serde::{Serialize, Deserialize};
 use rand::{thread_rng, RngCore};
 
@@ -85,8 +85,6 @@ pub struct SphinxPacket {
     pub payload: Vec<u8>,
 }
 
-use rand::{thread_rng, RngCore};
-
 impl SphinxPacket {
     /// Serializes the packet to exactly 9216 bytes with random padding.
     /// Addressing HIGH-04: Bitwise and Volumetric indistinguishability.
@@ -132,7 +130,7 @@ mod tests {
             "PACKET_SIZE ({}) must be >= header size ({})", 
             PACKET_SIZE, HEADER_TOTAL_SIZE);
         
-        println!("✅ Approach B Packet size: {} bytes (header: {} bytes)", 
+        println!("Approach B Packet size: {} bytes (header: {} bytes)",
             PACKET_SIZE, HEADER_TOTAL_SIZE);
     }
     
@@ -150,6 +148,6 @@ mod tests {
         }
         
         assert_eq!(batches.len(), 1_000_000, "All c_batch values should be unique");
-        println!("✅ c_batch uniqueness verified for 1M batches");
+        println!("c_batch uniqueness verified for 1M batches");
     }
 }

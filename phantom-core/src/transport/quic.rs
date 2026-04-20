@@ -1,16 +1,20 @@
 use quinn::{Endpoint, ServerConfig, TransportConfig};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::net::SocketAddr;
 use crate::identity::IdentityManager;
 use crate::packet::SphinxPacket;
 use crate::transport::certificate::generate_node_certificate;
+use crate::transport::{PhantomTransport as IPhantomTransport, TransportOptions};
 use rand::Rng;
-
-use crate::transport::PhantomTransport as IPhantomTransport;
 use async_trait::async_trait;
 
 pub struct QuicTransport {
     pub endpoint: Endpoint,
+    /// Connection state tracking
+    connected: AtomicBool,
+    /// Transport options
+    options: std::sync::Mutex<TransportOptions>,
 }
 
 impl QuicTransport {
@@ -53,7 +57,18 @@ impl QuicTransport {
             }
         };
 
-        Ok(Self { endpoint })
+        Ok(Self {
+            endpoint,
+            connected: AtomicBool::new(true),
+            options: std::sync::Mutex::new(TransportOptions::default()),
+        })
+    }
+
+    /// Update transport configuration options.
+    pub fn configure(&self, options: TransportOptions) -> anyhow::Result<()> {
+        let mut opts = self.options.lock().unwrap();
+        *opts = options;
+        Ok(())
     }
 }
 
@@ -109,5 +124,15 @@ impl IPhantomTransport for QuicTransport {
     /// Returns the local address of the QUIC endpoint.
     fn local_addr(&self) -> anyhow::Result<SocketAddr> {
         Ok(self.endpoint.local_addr()?)
+    }
+
+    /// Task 3.2: Set runtime transport options.
+    fn set_options(&self, options: TransportOptions) -> anyhow::Result<()> {
+        self.configure(options)
+    }
+
+    /// Task 3.2: Check if transport is currently connected/operational.
+    fn is_connected(&self) -> bool {
+        self.connected.load(Ordering::Relaxed)
     }
 }

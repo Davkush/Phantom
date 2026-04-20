@@ -67,8 +67,9 @@ pub struct NodeDescriptor {
     pub kyber_pubkey: [u8; 1568], // Kyber-1024
     pub quic_addr: std::net::SocketAddr,
     pub pow_nonce: [u8; 16],
+    pub pow_salt: [u8; 16],  // Added for deterministic PoW verification
     pub uptime_schedule: UptimeSchedule,
-    
+
     pub signature_ed25519: [u8; 64],
     pub signature_dilithium: Dilithium2Signature,
 }
@@ -93,8 +94,8 @@ impl NodeDescriptor {
         if node_id_check != self.node_id {
             return Err(anyhow::anyhow!("NodeID/PublicKey mismatch"));
         }
-        
-        if !crate::pow::verify_static_pow(&self.node_id, &self.pow_nonce, 4) {
+
+        if !crate::pow::verify_static_pow(&self.node_id, &self.pow_nonce, &self.pow_salt, 4) {
             return Err(anyhow::anyhow!("Insufficient PoW difficulty for DHT admission"));
         }
 
@@ -110,6 +111,7 @@ impl NodeDescriptor {
         data.extend_from_slice(&self.x25519_pubkey);
         data.extend_from_slice(&self.kyber_pubkey);
         data.extend_from_slice(&self.pow_nonce);
+        data.extend_from_slice(&self.pow_salt);
         data.extend_from_slice(&self.uptime_schedule.daily_bitfield.to_le_bytes());
         data
     }

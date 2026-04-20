@@ -10,7 +10,7 @@ pub mod genesis;
 pub mod replay_cache;
 pub mod batching;
 pub mod transport;
-pub mod cover_traffic;
+pub mod cover;
 pub mod dcnet;
 pub mod intro_point;
 pub mod rendezvous;
@@ -21,20 +21,22 @@ pub mod incentives;
 pub mod routing;
 pub mod hybrid_kem;
 pub mod kdf;
+pub mod time;
+pub mod churn;
 
 #[cfg(test)]
 mod tests {
     use crate::packet::{RoutingAction};
     use crate::builder::build_packet;
     use crate::processor::process_packet;
-    use phantom_crypto::hybrid_kem::HybridKeyPair;
+    use crate::hybrid_kem::HybridKeyPair;
 
     #[test]
     fn test_sphinx_packet_lifecycle() {
         use crate::replay_cache::ReplayCache;
-        let mut cache1 = ReplayCache::new(1000, 0.01);
-        let mut cache2 = ReplayCache::new(1000, 0.01);
-        let mut cache3 = ReplayCache::new(1000, 0.01);
+        let mut cache1 = ReplayCache::new(1000, 0.01, 1000);
+        let mut cache2 = ReplayCache::new(1000, 0.01, 1000);
+        let mut cache3 = ReplayCache::new(1000, 0.01, 1000);
 
         // Setup 3 nodes for the circuit: First, Middle, Last
         let node1 = HybridKeyPair::generate();

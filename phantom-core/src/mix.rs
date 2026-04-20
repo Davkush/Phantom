@@ -83,7 +83,7 @@ pub async fn run_mix_batch_loop(
                                             println!("Mix Processor: DELIVER action reached.");
                                             let _ = exit_tx.send(pkt).await;
                                         },
-                                        RoutingAction::DeliverSURB(surb_id) => {
+                                        RoutingAction::DeliverSURB(_surb_id) => {
                                             let _ = return_tx.send(pkt).await;
                                         },
                                         RoutingAction::DeliverIP => {

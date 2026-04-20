@@ -1,4 +1,4 @@
-# Phantom Protocol Technical Specification v1.0
+# Phantom Protocol Technical Specification v1.1
 
 ## 1. Mathematical Foundations
 
@@ -57,6 +57,52 @@ The network's Genesis configuration and PoW difficulty are governed by a 9-membe
 | **Argon2id Diff** | T = 3, M = 64MB | Sybil resistance PoW |
 | **Max Hops** | 5 | Standard anonymity depth |
 | **Port Mapping** | UPnP Port 443 | Automatic NAT traversal |
+
+## 5. Version 2 Address Derivation
+
+### 5.1 Overview
+Phantom addresses use a hierarchical derivation scheme based on SLIP-0010 (similar to BIP-32) for both Ed25519 (identity keys) and Kyber-1024 (post-quantum keys). This enables:
+
+- **Hierarchical Deterministic (HD) Key Derivation**: Generate multiple addresses from a single master seed
+- **Post-Quantum Security**: Kyber-1024 keys for resistance against quantum attacks
+- **Forward secrecy**: Derive ephemeral keys for each session
+
+### 5.2 Derivation Path
+```
+m / purpose' / type' / index'
+```
+
+| Level | Value | Description |
+|---|---|---|
+| `purpose` | `1234567'` | Phantom protocol identifier |
+| `type` | `0'` | Ed25519 master key derivation |
+| `type` | `1'` | Kyber-1024 PQ key derivation |
+| `index` | `N` | Sequential address index |
+
+### 5.3 Implementation
+```rust
+// Ed25519 path: m/1234567'/0'/0'
+let ed_path = slip10::path!("m/1234567'/0'/0'");
+
+// Kyber path: m/1234567'/1'/0'
+let kyber_path = slip10::path!("m/1234567'/1'/0'");
+
+// Derive master keys from seed
+let master_key = MasterKey::from_seed(&seed);
+
+// Generate addresses
+let ed_key = master_key.derive_key(ed_path);
+let pq_key = master_key.derive_key(kyber_path);
+let address = HybridPublicKey::combine(ed_key, pq_key);
+```
+
+### 5.4 Address Format
+```
+phatom1[base32-encoded-hybrid-key]
+```
+
+Example: `phatom1qpz5evrpqqq0f5x7y3j2z8n9m0k4l6h8o2p1q9r5s6t7u8v9w0x1y2z3`
+
 
 ---
 *© 2026 Phantom Protocol Foundation. Released under Apache 2.0.*
