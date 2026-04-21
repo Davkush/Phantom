@@ -7,7 +7,7 @@ use phantom_core::builder::{SphinxBuilder, build_packet};
 use phantom_core::routing::guards::GuardManager;
 use phantom_core::routing::path::PathSelector;
 use phantom_core::identity::NodeDescriptor;
-use phantom_crypto::kdf::{derive_key, KdfPurpose};
+use phantom_core::kdf::{derive_key, KdfPurpose};
 use chacha20poly1305::{ChaCha20Poly1305, Key, KeyInit, AeadInPlace};
 use chacha20poly1305::aead::{generic_array::GenericArray};
 use std::sync::Arc;
