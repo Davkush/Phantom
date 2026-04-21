@@ -28,7 +28,7 @@ fn derive_salt(challenge: &[u8]) -> [u8; 16] {
 pub fn solve_static_pow(challenge: &[u8], difficulty: u32) -> Option<PowSolution> {
     let params = Params::new(
         65536, // 64 MB minimum memory to defeat GPU scaling
-        2,     // 2 iterations
+        3,     // 3 iterations (Task 1.3 alignment)
         1,     // 1 degree of parallelism (sequential to enforce memory bottleneck)
         Some(32) // Output length
     ).unwrap();
@@ -60,7 +60,7 @@ pub fn solve_static_pow(challenge: &[u8], difficulty: u32) -> Option<PowSolution
 
 /// Verifies a solution to the memory-hard PoW puzzle.
 pub fn verify_static_pow(challenge: &[u8], nonce: &[u8; 16], salt: &[u8; 16], difficulty: u32) -> bool {
-    let params = Params::new(65536, 2, 1, Some(32)).unwrap();
+    let params = Params::new(65536, 3, 1, Some(32)).unwrap();
     let argon2 = Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, params);
 
     let mut input = Vec::with_capacity(challenge.len() + 16);

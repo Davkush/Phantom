@@ -149,12 +149,21 @@ impl IdentityManager {
             let key = SigningKey::generate(&mut csprng);
             let node_id: [u8; 32] = blake3::hash(key.verifying_key().as_bytes()).into();
 
-            // Solve initial PoW admission challenge
-            let solution = crate::pow::solve_static_pow(&node_id, 4)
+            // Solve initial PoW admission challenge (Task 1.3 Adaptive Difficulty)
+            let difficulty = get_current_difficulty();
+            let solution = crate::pow::solve_static_pow(&node_id, difficulty)
                 .unwrap_or(crate::pow::PowSolution {
                     nonce: [0u8; 16],
                     salt: [0u8; 16],
                 });
+
+            // MED-02: Record admission for burst detection
+            {
+                let mut detector = get_global_burst_detector();
+                if let Some(d) = detector.as_mut() {
+                    d.record_admission();
+                }
+            }
 
             if let Some(parent) = path.as_ref().parent() {
                 fs::create_dir_all(parent)?;
