@@ -75,6 +75,11 @@ pub struct NodeDescriptor {
 }
 
 impl NodeDescriptor {
+    /// Task 1.4: Mandatory Admission Gate (Sig + Epoch + PoW)
+    pub fn verify_full(&self) -> anyhow::Result<()> {
+        self.verify_integrity()
+    }
+
     /// HIGH-03 Fix: Cryptographic Integrity & Sybil Verification
     pub fn verify_integrity(&self) -> anyhow::Result<()> {
         // 1. Classical Signature (Ed25519)

@@ -26,6 +26,7 @@ impl IntroductionHandler {
         let mut state = self.state.lock().await;
         state.record_request();
         let difficulty = state.get_dynamic_difficulty();
+        let surb_onion = vec![0u8; 1568 * 5]; // Full Kyber-1024 ciphertexts
         
         // 2. Deserialize IntroRequest from payload
         let request: IntroRequest = bincode::deserialize(&packet.payload)

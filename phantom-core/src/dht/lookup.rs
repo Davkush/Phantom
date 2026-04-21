@@ -58,12 +58,19 @@ impl DhtNode {
             let mut newly_discovered = Vec::new();
             for node in to_query {
                 queried.insert(node.node_id);
-                // Execute logical RPC traversal jump
-                let (found, peers) = self.rpc_find_node(node.node_id, target).await;
-                if let Some(target_desc) = found { 
-                    return Some(target_desc); 
+                // Execute logical RPC traversal jump over real QUIC (Task 1.4)
+                match self.rpc_find_node(node.quic_addr, target).await {
+                    Ok(peers) => {
+                        // Check if target was found in this set
+                        if let Some(target_desc) = peers.iter().find(|n| n.node_id == target) {
+                            return Some(target_desc.clone());
+                        }
+                        newly_discovered.extend(peers);
+                    }
+                    Err(e) => {
+                        println!("DHT: RPC failure to {:?}: {}", node.quic_addr, e);
+                    }
                 }
-                newly_discovered.extend(peers);
             }
 
             if newly_discovered.is_empty() {
@@ -89,13 +96,24 @@ impl DhtNode {
         sorted.into_iter().take(k).collect()
     }
 
-    /// Simulated Phase 1 Quic RPC 'FIND_NODE' protocol.
-    async fn rpc_find_node(&self, _peer: [u8; 32], _target: [u8; 32]) -> (Option<NodeDescriptor>, Vec<NodeDescriptor>) {
-        // Simulate real QUIC RTT latencies
-        tokio::time::sleep(std::time::Duration::from_millis(15)).await;
-        // The mock currently doesn't possess peer routing tables, only its own.
-        // Returning empty array forces lookup to rely strictly on initial graph local seeds.
-        (None, vec![]) 
+    /// Real QUIC RPC 'FIND_NODE' protocol (Task 1.4).
+    async fn rpc_find_node(
+        &self, 
+        peer_addr: std::net::SocketAddr, 
+        target: [u8; 32]
+    ) -> Result<Vec<NodeDescriptor>, super::transport::TransportError> {
+        let response = self.transport.send_rpc(peer_addr, super::transport::DhtRpc::FindNode { target }).await?;
+
+        match response {
+            super::transport::DhtResponse::Nodes(descriptors) => {
+                // Task 1.4 Gate: Validate every returned descriptor before it touches routing table.
+                let valid: Vec<NodeDescriptor> = descriptors.into_iter()
+                    .filter(|d| d.verify_full().is_ok())
+                    .collect();
+                Ok(valid)
+            }
+            _ => Err(super::transport::TransportError::UnexpectedResponse),
+        }
     }
     
     /// Finds the most frequent descriptor that meets the quorum threshold.

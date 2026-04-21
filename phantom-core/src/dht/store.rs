@@ -8,14 +8,18 @@ pub enum DhtError {
     NetworkError,
 }
 
+use std::sync::Arc;
+use super::transport::DhtTransport;
+
 pub struct DhtNode {
     pub local_id: [u8; 32],
     pub known_peers: Vec<NodeDescriptor>,
+    pub transport: Arc<dyn DhtTransport>,
 }
 
 impl DhtNode {
-    pub fn new(local_id: [u8; 32]) -> Self {
-        Self { local_id, known_peers: Vec::new() }
+    pub fn new(local_id: [u8; 32], transport: Arc<dyn DhtTransport>) -> Self {
+        Self { local_id, known_peers: Vec::new(), transport }
     }
 
     /// SR-DHT-Store: Active Sybil-Resistant Regional Publication (HIGH-03)

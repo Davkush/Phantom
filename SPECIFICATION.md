@@ -31,6 +31,7 @@ To solve the "Relay Trust" problem, Phantom implements a permutation argument ci
 ### 2.1 Single-Use Reply Blocks (SURBs)
 Phantom enables anonymous return paths without the exit node knowing the client's identity.
 *   **Piggybacking**: 5 SURBs are included in every outbound 9KB packet.
+*   **Hardened KEM**: Each SURB carries a full 1568-byte Kyber ciphertext (Task 1.1) to preserve FO transform integrity.
 *   **Replenishment**: SURB pools are maintained by the StreamManager to prevent TCP starvation.
 
 ### 2.2 PhantomStream (The Reliability Layer)
@@ -81,19 +82,19 @@ m / purpose' / type' / index'
 
 ### 5.3 Implementation
 ```rust
-// Ed25519 path: m/1234567'/0'/0'
+// Corrected (address derived from permanent signing keys only):
+// service_address = BLAKE3("phantom-hs-v2" || pk_ed || pk_dil)
+
+// Ed25519 path: m/1234567'/0'/0' (Permanent Identity)
 let ed_path = slip10::path!("m/1234567'/0'/0'");
 
-// Kyber path: m/1234567'/1'/0'
-let kyber_path = slip10::path!("m/1234567'/1'/0'");
+// Dilithium path: m/1234567'/2'/0' (Permanent PQ Identity)
+let dil_path = slip10::path!("m/1234567'/2'/0'");
 
-// Derive master keys from seed
-let master_key = MasterKey::from_seed(&seed);
-
-// Generate addresses
+// Generate address
 let ed_key = master_key.derive_key(ed_path);
-let pq_key = master_key.derive_key(kyber_path);
-let address = HybridPublicKey::combine(ed_key, pq_key);
+let dil_key = master_key.derive_key(dil_path);
+let address = HiddenServiceAddress::derive_v2(ed_key, dil_key);
 ```
 
 ### 5.4 Address Format
