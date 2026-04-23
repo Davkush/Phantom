@@ -85,10 +85,13 @@ impl IPhantomTransport for QuicTransport {
         let connection = self.endpoint.connect(target_addr, "phantom-node")?.await?;
         
         // 2. Open unidirectional stream
-        let stream = connection.open_uni().await?;
+        let mut stream = connection.open_uni().await?;
         
         // 3. Apply Traffic Shaping (Poisson + 9KB random padding) and Dispatch
-        shaper.shape_and_send(stream, packet).await?;
+        shaper.shape_and_send(&mut stream, packet).await?;
+        
+        // Quinn-specific stream termination
+        stream.finish().await?;
         
         Ok(())
     }

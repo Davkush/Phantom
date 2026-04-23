@@ -1,9 +1,9 @@
 use crate::cover::poisson::PoissonTimer;
 use crate::packet::SphinxPacket;
-use quinn::SendStream;
+use tokio::io::AsyncWriteExt;
+use std::time::Duration;
 use rand::Rng;
 use rand::distributions::WeightedIndex;
-use std::time::Duration;
 
 /// Task 3.1 (HIGH-04): DPI Fingerprinting Evasion.
 ///
@@ -77,9 +77,9 @@ impl TrafficShaper {
 
     /// Applies Poisson-distributed delay and variable-size padding.
     /// This is the primary physical dispatch hook for Ghost nodes.
-    pub async fn shape_and_send(
+    pub async fn shape_and_send<W: tokio::io::AsyncWrite + Unpin>(
         &self,
-        mut stream: SendStream,
+        mut stream: W,
         packet: SphinxPacket
     ) -> anyhow::Result<()> {
         // 1. Variable-size serialization
@@ -92,7 +92,7 @@ impl TrafficShaper {
 
         // 3. Physical Dispatch
         stream.write_all(&data).await?;
-        stream.finish().await?;
+        stream.flush().await?;
         Ok(())
     }
 }

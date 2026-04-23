@@ -3,6 +3,8 @@ pub mod quic;
 pub mod certificate;
 pub mod nat;
 
+pub use quic::QuicTransport;
+
 use async_trait::async_trait;
 use std::net::SocketAddr;
 use crate::packet::SphinxPacket;

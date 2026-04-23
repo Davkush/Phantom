@@ -23,6 +23,7 @@ pub async fn run_mix_batch_loop(
     rp_splicer: Arc<Mutex<RendezvousSplicer>>,
     reciprocal_tracker: Arc<ReciprocalTracker>,
     node_keypair: HybridKeyPair,
+    node_identity: [u8; 32],
     replay_cache: Arc<Mutex<ReplayCache>>, // HIGH-05: Replay protection
     token: tokio_util::sync::CancellationToken,
 ) {
@@ -72,8 +73,8 @@ pub async fn run_mix_batch_loop(
                                 Ok(block) => {
                                     outputs.push(blake3::hash(&pkt.current_kem).into());
                                     
-                                    // Peer reputation credit
-                                    reciprocal_tracker.record_success([0u8; 32]).await;
+                                    // Peer reputation credit (using identity)
+                                    reciprocal_tracker.record_success(node_identity).await;
                                     
                                     match block.action {
                                         RoutingAction::Forward(_) => {
@@ -112,7 +113,7 @@ pub async fn run_mix_batch_loop(
                     let zk_tx = zk_time_tx.clone();
                     let _ = batch_size_tx.send(input_hashes.len()).await;
                     
-                    let node_id = [0u8; 32];
+                    let node_id = node_identity;
                     tokio::spawn(async move {
                         let start = std::time::Instant::now();
                         if let Ok(proof) = generate_shuffle_proof(input_hashes, outputs, node_id) {

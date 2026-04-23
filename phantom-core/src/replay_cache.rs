@@ -33,8 +33,8 @@ impl ReplayCache {
     /// * `max_entries` - Maximum entries per bucket (default: 500,000)
     pub fn new(size: usize, fp_rate: f64, max_entries: usize) -> Self {
         Self {
-            current_bucket: Bloom::new(size, fp_rate),
-            previous_bucket: Bloom::new(size, fp_rate),
+            current_bucket: Bloom::new_for_fp_rate(size, fp_rate),
+            previous_bucket: Bloom::new_for_fp_rate(size, fp_rate),
             size,
             fp_rate,
             current_count: AtomicU64::new(0),
@@ -51,7 +51,7 @@ impl ReplayCache {
         println!("ReplayCache: Rotating buckets, discarding {} entries from previous epoch", discarded_count);
 
         // Swap buckets
-        self.previous_bucket = std::mem::replace(&mut self.current_bucket, Bloom::new(self.size, self.fp_rate));
+        self.previous_bucket = std::mem::replace(&mut self.current_bucket, Bloom::new_for_fp_rate(self.size, self.fp_rate));
 
         // Update counters
         self.previous_count.store(self.current_count.load(Ordering::Relaxed), Ordering::Relaxed);

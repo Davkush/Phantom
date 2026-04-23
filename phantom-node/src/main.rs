@@ -142,12 +142,13 @@ async fn main() -> anyhow::Result<()> {
 
         // Session Task 1: Mix Processor
         let mix_node_keypair = id_manager.mix_keypair();
+        let mix_node_id = id_manager.node_id();
         let mix_token = session_token.clone();
         let mix_handle = tokio::spawn(run_mix_batch_loop(
             mix_rx, out_tx.clone(), exit_tx, return_tx, proof_tx,
             batch_size_tx, zk_time_tx, Some(ip_handler.clone()),
             rp_splicer.clone(), reciprocal_tracker.clone(), 
-            mix_node_keypair, replay_cache.clone(), mix_token
+            mix_node_keypair, mix_node_id, replay_cache.clone(), mix_token
         ));
 
         // Session Task 2: Wire Listener
