@@ -111,18 +111,19 @@ async fn run_bidirectional_stream(
                 let payload = bincode::serialize(&envelope).unwrap();
                 
                 // Construct Sphinx Packet using the pre-built SURB header
-                let return_pkt = SphinxPacket {
+                let mut return_pkt = SphinxPacket {
                     version: 1,
-                    flags: 0,
                     epoch: 0,
-                    alpha_cl: [0u8; 32], // Not used for SURB usually
-                    alpha_pq_onion: surb.header.clone(), 
-                    beta_routing: [0u8; 128],
+                    current_kem: [0u8; 1600],
+                    beta_routing: [0u8; 68],
                     gamma_mac: [0u8; 32],
-                    c_batch: [0u8; 16],
-                    pi_ref: 0,
+                    kem_sidecar: [0u8; 6400],
                     payload,
                 };
+                
+                // If surb.header contains pre-built layers, we could parse them here.
+                // For now, we mock the return path.
+
                 
                 let _ = outbound_tx.send(return_pkt).await;
                 seq_num += 1;

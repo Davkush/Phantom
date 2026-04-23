@@ -7,14 +7,14 @@ This document serves as the high-level technical bridge between the `SPECIFICATI
 ### 1. Cryptographic Hardening
 - [x] **ZK Shuffle Binding**: Implementing 256-bit RLC in Plonky2 to prevent mix-and-match attacks.
 - [x] **KEM Geometry (Approach B)**: Enforcing the 9KB packet layout with a 1,600-byte sidecar.
-- [/] **SURB Security**: Transitioning SurbBlocks from 96-byte Kyber fragments to 1568-byte full ciphertexts.
+- [x] **SURB Security**: Transitioning SurbBlocks from 96-byte Kyber fragments to 1568-byte full ciphertexts (Task 1.1).
 
 ### 2. Sybil Resistance
 - [x] **Argon2id PoW**: Aligning admission difficulty with high-memory ASIC-resistant parameters (64MB, t=3).
-- [/] **Real QUIC Transport**: Replacing simulated DHT RPCs with Quinn-based networking.
+- [x] **Real QUIC Transport**: Replacing simulated DHT RPCs with Quinn-based networking. MTU 9000 and 500ms timeout configured. `DhtTransport` abstraction implemented and multi-path lookup integrated (Task 1.4).
 
 ### 3. Hidden Services
-- [/] **Address Derivation v2**: Moving to `phantom-hs-v2` derived from permanent signing keys for improved forward secrecy.
+- [x] **Address Derivation v2**: Moved to `phantom-hs-v2` derived from permanent signing keys for improved forward secrecy (LOW-04).
 - [ ] **Dual-Blind Handshake**: Implementation of IP (Introduction Point) and RP (Rendezvous Point) logic.
 
 ## Module Ownership

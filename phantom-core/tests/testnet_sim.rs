@@ -110,14 +110,11 @@ async fn test_live_localhost_quic() {
     // 5. Node A builds and sends a 9KB packet to B
     let packet = SphinxPacket {
         version: 1,
-        flags: 0,
         epoch: 42,
-        alpha_cl: [0u8; 32],
-        alpha_pq_onion: vec![0u8; 1568 * 5],
-        beta_routing: [0u8; 128],
+        current_kem: [0u8; 1600],
+        beta_routing: [0u8; 68],
         gamma_mac: [0u8; 32],
-        c_batch: [0u8; 16],
-        pi_ref: 0,
+        kem_sidecar: [0u8; 6400],
         payload: b"Physical wire test payload".to_vec(),
     };
     

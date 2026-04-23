@@ -55,8 +55,11 @@ async fn test_throughput_mbps() -> anyhow::Result<()> {
         let header = PhantomStreamHeader {
             stream_id,
             seq_num,
+            ack_num: 0,
+            window_size: 64,
             padding_len: (chunk_size - n) as u32,
             target_addr: None,
+            surb_id: None,
         };
         
         let mut payload = bincode::serialize(&header)?;
@@ -65,14 +68,11 @@ async fn test_throughput_mbps() -> anyhow::Result<()> {
 
         let pkt = SphinxPacket {
             version: 1,
-            flags: 0,
             epoch: 0,
-            alpha_cl: [0u8; 32],
-            alpha_pq_onion: vec![0u8; 1568 * 5],
-            beta_routing: [0u8; 128],
+            current_kem: [0u8; 1600],
+            beta_routing: [0u8; 68],
             gamma_mac: [0u8; 32],
-            c_batch: [0u8; 16],
-            pi_ref: 0,
+            kem_sidecar: [0u8; 6400],
             payload,
         };
 
