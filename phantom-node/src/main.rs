@@ -229,6 +229,21 @@ async fn main() -> anyhow::Result<()> {
             }
         });
 
+        // Session Task 8: Cover Traffic Loop (Task 3.1)
+        // Provides 700ms Poisson-distributed decoy traffic to mask active streams.
+        let cover_transport = transport.clone();
+        let cover_shaper = Arc::new(TrafficShaper::new(700.0));
+        // Select a random guard for the cover traffic destination
+        let mut rng = rand::thread_rng();
+        let target_guard = if !guards.is_empty() {
+             guards[rng.gen_range(0..guards.len())].quic_addr
+        } else {
+             SocketAddr::from(([127, 0, 0, 1], 443))
+        };
+        let cover_handle = tokio::spawn(async move {
+             run_cover_loop(700.0, mix_tx.clone(), &cover_transport, target_guard, &cover_shaper).await;
+        });
+
         println!("Phantom Node is ONLINE.");
 
         // Wait for session termination
@@ -236,6 +251,7 @@ async fn main() -> anyhow::Result<()> {
         println!("=== Session Ending: Entering OFFLINE Phase ===");
         
         let _ = churn_handle.await;
+        let _ = cover_handle.abort(); // Stop cover traffic during offline phase
         
         let offline_duration = churn_manager.get_offline_duration();
         println!("Offline Phase: Sleeping for {} minutes according to UptimeSchedule...", offline_duration.as_secs() / 60);

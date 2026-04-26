@@ -76,8 +76,12 @@ pub fn process_packet(
     thread_rng().fill_bytes(&mut next_sidecar[(SIDECAR_SIZE - KEM_BLOCK_SIZE)..]);
     packet.kem_sidecar.copy_from_slice(&next_sidecar);
 
-    // Refresh Routing Onion (Beta)
-    thread_rng().fill_bytes(&mut packet.beta_routing);
+    // Peeling the Beta Onion (Routing Info)
+    // Shift by 68 bytes and append 68 bytes of random noise
+    let mut next_beta = [0u8; ROUTING_INFO_SIZE];
+    next_beta[0..(ROUTING_INFO_SIZE - 68)].copy_from_slice(&packet.beta_routing[68..]);
+    thread_rng().fill_bytes(&mut next_beta[(ROUTING_INFO_SIZE - 68)..]);
+    packet.beta_routing.copy_from_slice(&next_beta);
 
     Ok(root_block)
 }

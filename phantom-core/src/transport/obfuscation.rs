@@ -31,6 +31,7 @@ pub struct TrafficShaper {
 impl TrafficShaper {
     /// Create a new TrafficShaper with default parameters.
     pub fn new(mean_interval_ms: f64) -> Self {
+        // Task 3.1: Default mean 700ms from Adversary Model
         let size_distribution = WeightedIndex::new(&PACKET_WEIGHTS).unwrap();
         Self {
             poisson_timer: PoissonTimer::new(mean_interval_ms),
@@ -108,7 +109,7 @@ mod tests {
         let mut large_packets = 0;
         let iterations = 10_000;
 
-        let shaper = TrafficShaper::new(100.0);
+        let shaper = TrafficShaper::new(700.0);
 
         println!("Initiating Statistical DPI Profiler tests...");
 
@@ -130,14 +131,14 @@ mod tests {
         assert!(small_packets > 500 && small_packets < 1500, "Volumetric profile distribution skewed");
 
         // 2. Validate Temporal Evasion (Poisson Timing)
-        let timer = PoissonTimer::new(100.0);
+        let timer = PoissonTimer::new(700.0);
         let mut precise_heartbeat_hits = 0;
         let mut total_delay_ms = 0.0;
 
         for _ in 0..iterations {
             let delay = timer.next_delay().as_secs_f64() * 1000.0;
             // A fixed periodic heartbeat would repeatedly trigger the exact target ms
-            if (delay - 100.0).abs() < 0.0001 {
+            if (delay - 700.0).abs() < 0.0001 {
                 precise_heartbeat_hits += 1;
             }
             total_delay_ms += delay;
@@ -147,14 +148,14 @@ mod tests {
         assert_eq!(precise_heartbeat_hits, 0, "Fixed predictable heartbeats detected!");
 
         let empirical_mean = total_delay_ms / (iterations as f64);
-        assert!(empirical_mean > 90.0 && empirical_mean < 110.0, "Poisson drift misses targeted mean throughput");
+        assert!(empirical_mean > 650.0 && empirical_mean < 750.0, "Poisson drift misses targeted mean throughput");
 
         println!("Statistical Volumetric & Temporal Profilers Defeated (HIGH-04 Closed)");
     }
 
     #[test]
     fn test_packet_size_distribution() {
-        let shaper = TrafficShaper::new(100.0);
+        let shaper = TrafficShaper::new(700.0);
         let mut counts = [0usize; 4];
 
         for _ in 0..10_000 {

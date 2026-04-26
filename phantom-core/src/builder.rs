@@ -73,7 +73,6 @@ pub fn build_packet(
             .map_err(|_| "Sidecar encryption failed")?;
 
         // 3. Prepare Routing Block for THIS hop
-        // MED-03 Fix: Bind c_batch to node_id and shared secret to prevent linkage
         let mut hasher = blake3::Hasher::new();
         hasher.update(&c_batch); // Original batch secret
         hasher.update(&path[i].x25519_pub); // Bind to target node's identity
@@ -84,12 +83,18 @@ pub fn build_packet(
             c_batch: hop_c_batch,
             epoch,
         };
-        let mut routing_bytes = bincode::serialize(&routing_block)
+        let routing_bytes = bincode::serialize(&routing_block)
             .map_err(|_| "Routing block serialization failed")?;
 
+        // Onion Wrapping: Shift previous layers and prepend current layer
         let mut new_beta = [0u8; ROUTING_INFO_SIZE];
-        let copy_len = std::cmp::min(routing_bytes.len(), ROUTING_INFO_SIZE);
+        let copy_len = std::cmp::min(routing_bytes.len(), 68);
         new_beta[..copy_len].copy_from_slice(&routing_bytes[..copy_len]);
+        
+        // Carry over previous onion layers (shifted)
+        if i < (hops - 1) {
+             new_beta[68..].copy_from_slice(&current_beta[0..(ROUTING_INFO_SIZE - 68)]);
+        }
 
         // Encrypt Routing Onion (Beta)
         aead_header.encrypt_in_place(&nonce, b"", &mut new_beta)
