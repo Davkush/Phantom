@@ -14,7 +14,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 
 mod proxy;
-mod reliability;
+mod churn;
 mod metrics;
 mod sentinel;
 mod governance;
@@ -24,7 +24,7 @@ mod config;
 
 use crate::proxy::socks5::{Socks5Entry, StreamManager};
 use crate::proxy::exit::ExitNode;
-use crate::reliability::{run_churn_loop};
+use crate::churn::ChurnManager;
 use phantom_core::cover::run_cover_loop;
 use phantom_core::cover::poisson::PoissonTimer;
 use phantom_core::transport::obfuscation::TrafficShaper;
@@ -170,8 +170,12 @@ async fn main() -> anyhow::Result<()> {
         // Session Task 4: Churn Manager
         let sm_for_churn = stream_manager.clone();
         let uptime_hours = cfg.variable_uptime_hours;
+        // In production, the seed comes from the identity manager
+        let node_seed = [0u8; 32]; 
+        let churn_manager = Arc::new(ChurnManager::new(node_seed, uptime_hours, sm_for_churn));
+        let cm_handle = churn_manager.clone();
         let churn_handle = tokio::spawn(async move {
-            run_churn_loop(uptime_hours, sm_for_churn).await;
+            cm_handle.run_session_loop().await;
             session_token_churn.cancel();
         });
 
@@ -233,9 +237,8 @@ async fn main() -> anyhow::Result<()> {
         
         let _ = churn_handle.await;
         
-        let mut rng = rand::thread_rng();
-        let offline_secs = rng.gen_range(1800..5400); 
-        println!("Offline Phase: Sleeping for {} seconds...", offline_secs);
-        tokio::time::sleep(Duration::from_secs(offline_secs)).await;
+        let offline_duration = churn_manager.get_offline_duration();
+        println!("Offline Phase: Sleeping for {} minutes according to UptimeSchedule...", offline_duration.as_secs() / 60);
+        tokio::time::sleep(offline_duration).await;
     }
 }
