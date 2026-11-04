@@ -1,0 +1,10 @@
+FROM python:3.11-slim
+# Healthcare protocol libraries
+# Supports: dicom_probe, hl7_probe, med_device_probe
+RUN pip install --no-cache-dir \
+    pydicom==2.4.3 \
+    pynetdicom==2.0.2 \
+    hl7apy==1.3.3 \
+    requests==2.31.0
+# Note: DICOM and HL7 modules have raw-socket fallback if libs missing
+WORKDIR /harness

@@ -1,0 +1,3 @@
+FROM python:3.11-slim
+RUN pip install --no-cache-dir web3==6.11.1 requests==2.31.0
+WORKDIR /harness

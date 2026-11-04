@@ -1,0 +1,5 @@
+# Dockerfile.busybox — ESXi simulation (module 5).
+FROM busybox:latest
+# BusyBox pour simuler l'environnement ESXi (nc, sh, sed sans coreutils)
+RUN mkdir -p /etc/rc.local.d
+WORKDIR /harness

@@ -1,0 +1,10 @@
+# Dockerfile.aflpp — AFL++ pour fuzzing binaire (module 11).
+FROM ubuntu:22.04
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    afl++ afl++-doc gcc && \
+    rm -rf /var/lib/apt/lists/*
+# AFL++ s'installe via apt sur Ubuntu 22.04
+# Alternative : build from source https://github.com/AFLplusplus/AFLplusplus
+ENV AFL_DIR=/usr
+WORKDIR /harness

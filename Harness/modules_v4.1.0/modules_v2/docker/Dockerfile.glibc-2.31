@@ -1,0 +1,10 @@
+# Dockerfile.glibc-2.31 — environnement glibc 2.31 pour c_heap_exploit.
+FROM ubuntu:20.04
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc gdb binutils && \
+    rm -rf /var/lib/apt/lists/*
+# glibc 2.31 est natif sur Ubuntu 20.04 — pas d'installation supplémentaire
+WORKDIR /harness
+# __free_hook existe jusqu'à glibc 2.33 (supprimé en 2.34+)
+# Vérifier : readelf -s /lib/x86_64-linux-gnu/libc.so.6 | grep __free_hook

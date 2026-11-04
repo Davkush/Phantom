@@ -1,0 +1,19 @@
+FROM python:3.11-slim
+# Universal sector base — supports all 7 sectors via SECTOR env var
+# (ot, banking, health, energy, crypto, telecom, cross-sector)
+RUN pip install --no-cache-dir requests==2.31.0
+# Install protocol libraries for all sectors (larger image but universal)
+RUN pip install --no-cache-dir \
+    pymodbus==3.5.4 \
+    pydicom==2.4.3 \
+    pynetdicom==2.0.2 \
+    iso8583==2.0.0 \
+    mnemonic==0.20 \
+    2>/dev/null || true
+# Optional libraries (may fail on some platforms)
+RUN apt-get update && apt-get install -y --no-install-recommends libsnap7-1 2>/dev/null || true && \
+    pip install --no-cache-dir python-snap7 asyncua hl7apy 2>/dev/null || true && \
+    rm -rf /var/lib/apt/lists/*
+WORKDIR /harness
+# USER nobody — non-root for safety
+USER nobody

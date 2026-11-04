@@ -1,0 +1,9 @@
+FROM python:3.11-slim
+# Banking protocol libraries
+# Supports: iso8583_probe, swift_probe, core_banking_probe, open_banking_probe
+RUN pip install --no-cache-dir \
+    requests==2.31.0 \
+    iso8583==2.0.0 \
+    cryptography==41.0.0
+# Note: SWIFT Alliance has no public library — modules use raw HTTP/TLS
+WORKDIR /harness

@@ -1,0 +1,5 @@
+# Dockerfile.net-tools — outils réseau pour preauth, fuzzer_send.
+FROM python:3.11-slim
+RUN pip install --no-cache-dir requests==2.31.0
+WORKDIR /harness
+USER nobody

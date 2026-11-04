@@ -1,0 +1,12 @@
+# Dockerfile.php-chain — PHP + Composer + monolog/guzzle pour php_chain.
+# v2.4 : erreur fatale si composer échoue (|| true supprimé) + USER non-root
+FROM php:7.4-cli
+RUN apt-get update && apt-get install -y --no-install-recommends unzip git && \
+    rm -rf /var/lib/apt/lists/*
+# Composer
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+WORKDIR /harness
+# v2.4 : dépendances — erreur fatale si échec (pas de || true)
+RUN composer require monolog/monolog:2.9.1 guzzlehttp/guzzle:7.4.5 --no-dev
+# v2.4 : utilisateur non-root (principe du moindre privilège)
+USER nobody

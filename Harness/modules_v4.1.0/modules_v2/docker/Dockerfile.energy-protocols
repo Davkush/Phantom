@@ -1,0 +1,8 @@
+FROM python:3.11-slim
+# Energy protocol libraries (IEC 61850, synchrophasor)
+# Supports: iec61850_probe, synchrophasor_probe, iec104_probe, bacnet_probe
+RUN pip install --no-cache-dir pymodbus==3.5.4
+# IEC 61850 uses libiec61850 (C library) — Python bindings optional
+# Synchrophasor uses raw socket (no library needed)
+# Note: modules have raw-socket fallback for all protocols
+WORKDIR /harness

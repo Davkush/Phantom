@@ -1,0 +1,12 @@
+FROM python:3.11-slim
+# OT protocol libraries for SCADA/ICS probes
+# Supports: modbus_probe, s7comm_probe, opcua_probe, dnp3_probe,
+#           bacnet_probe, ethernetip_probe, iec104_probe
+RUN pip install --no-cache-dir pymodbus==3.5.4 pycomm3==1.2.2 BAC0==22.11.5
+# Note: python-snap7 requires libsnap7 — install system dep
+RUN apt-get update && apt-get install -y --no-install-recommends libsnap7-1 && \
+    rm -rf /var/lib/apt/lists/* && \
+    pip install --no-cache-dir python-snap7==2.0.0
+# OPC-UA (optional, modules have raw-socket fallback)
+RUN pip install --no-cache-dir asyncua==1.4.0 || true
+WORKDIR /harness

@@ -1,0 +1,22 @@
+# Dockerfile.php-asan — PHP 7.4 debug + ASAN pour modules php_uaf, php_chain.
+FROM ubuntu:20.04
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    wget gcc make autoconf libtool re2c bison \
+    libxml2-dev libsqlite3-dev && \
+    rm -rf /var/lib/apt/lists/*
+WORKDIR /tmp
+RUN wget -q https://www.php.net/distributions/php-7.4.33.tar.gz && \
+    tar xzf php-7.4.33.tar.gz && cd php-7.4.33 && \
+    ./configure --enable-debug --enable-address-sanitizer \
+        --disable-all --enable-cli --enable-json --enable-ctype \
+        --enable-tokenizer --enable-mbstring && \
+    # v2.4 : limiter les threads pour ne pas saturer le CPU host
+    make -j$(($(nproc)/2 > 0 ? $(nproc)/2 : 1)) && make install && \
+    cd /tmp && rm -rf php-7.4.33 php-7.4.33.tar.gz
+# Composer pour php_chain
+RUN wget -q https://getcomposer.org/installer && \
+    php installer --install-dir=/usr/local/bin --filename=composer
+WORKDIR /harness
+# v2.4 : utilisateur non-root (principe du moindre privilège)
+USER nobody

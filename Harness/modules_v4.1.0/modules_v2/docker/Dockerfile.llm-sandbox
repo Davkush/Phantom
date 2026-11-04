@@ -1,0 +1,15 @@
+# Dockerfile.llm-sandbox — boucle LLM avec nsjail (module 13).
+# v2.4 : ATTENTION — nsjail n'est disponible que sur x86_64. Sur ARM
+# (Apple Silicon, Raspberry Pi, certains serveurs cloud), l'installation
+# échouera. Utiliser SANDBOX_CMD=bwrap comme alternative sur ARM.
+FROM python:3.11-slim
+RUN pip install --no-cache-dir requests==2.31.0 && \
+    apt-get update && apt-get install -y --no-install-recommends \
+    bwrap && \
+    rm -rf /var/lib/apt/lists/*
+# v2.4 : nsjail installé séparément car non dans les repos standard
+# Sur ARM, commenter la ligne nsjail et utiliser SANDBOX_CMD=bwrap
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends nsjail 2>/dev/null || \
+    echo "WARNING: nsjail non disponible sur cette architecture — utiliser bwrap"
+WORKDIR /harness

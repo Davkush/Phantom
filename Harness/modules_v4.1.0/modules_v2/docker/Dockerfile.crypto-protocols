@@ -1,0 +1,10 @@
+FROM python:3.11-slim
+# Crypto protocol libraries
+# Supports: eth_rpc_probe, wallet_extract, web3_module, geth_rpc_module
+RUN pip install --no-cache-dir \
+    web3==6.11.1 \
+    eth-account==0.10.0 \
+    mnemonic==0.20
+# Note: eth_rpc_probe uses raw JSON-RPC (no web3.py needed)
+# wallet_extract uses mnemonic wordlist for BIP39 detection
+WORKDIR /harness

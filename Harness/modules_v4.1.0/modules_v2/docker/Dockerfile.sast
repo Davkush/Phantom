@@ -1,0 +1,14 @@
+# Dockerfile.sast — Semgrep + CodeQL pour analyse statique (module 12).
+# v2.4 : WARNING — CodeQL CLI n'est pas installé par défaut.
+# Le module 12 reportera ENV_ERROR pour la partie CodeQL si non installé.
+FROM returntocorp/semgrep:latest
+# Pour activer CodeQL, décommenter les lignes ci-dessous :
+# RUN curl -L https://github.com/github/codeql-cli-binaries/releases/latest/download/codeql-linux64.zip -o /tmp/codeql.zip && \
+#     cd /tmp && unzip codeql.zip && mv codeql /usr/local/bin/codeql
+RUN apk add --no-cache curl bash
+# v2.4 : avertissement visible dans les logs de build
+RUN echo "WARNING: CodeQL not installed. Module 12 will report ENV_ERROR for CodeQL analysis. Uncomment the curl line above to enable."
+WORKDIR /harness
+# v2.4 : HEALTHCHECK pour vérifier que Semgrep est fonctionnel
+HEALTHCHECK --interval=5m --timeout=10s --retries=2 \
+    CMD semgrep --version || exit 1
