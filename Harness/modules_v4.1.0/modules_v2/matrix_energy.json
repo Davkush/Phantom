@@ -1,0 +1,31 @@
+{
+  "harness": "3.0.0",
+  "schema_version": "2.0",
+  "sector": "energy",
+  "targets": {
+    "iec104_probe": {
+      "expected": "summary.get('link_active') is not None",
+      "note": "IEC 60870-5-104. Commande disjoncteur = impact physique. NERC CIP."
+    },
+    "dnp3_probe": {
+      "expected": "summary.get('link_established') is not None",
+      "note": "DNP3 eau/gaz/électricité. NIS2."
+    },
+    "bacnet_probe": {
+      "expected": "summary.get('devices_found') is not None",
+      "note": "BACnet HVAC data center. Arrêt thermique possible."
+    },
+    "modbus_probe": {
+      "expected": "summary.get('device_identified') is not None",
+      "note": "Modbus energy controllers."
+    },
+    "post_exploit_enum": {
+      "expected": "summary.get('summary') is not None",
+      "note": "HVT : EMS, DMS, historian, protective relays."
+    },
+    "persistence": {
+      "expected": "summary.get('deployed') is not None",
+      "note": "LAB=1. Persistence sur SCADA/EMS."
+    }
+  }
+}

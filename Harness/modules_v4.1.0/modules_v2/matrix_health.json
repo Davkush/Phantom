@@ -1,0 +1,31 @@
+{
+  "harness": "3.0.0",
+  "schema_version": "2.0",
+  "sector": "health",
+  "targets": {
+    "dicom_probe": {
+      "expected": "summary.get('c_echo_ok') is not None",
+      "note": "DICOM accessible sans auth. PHI leak = HIPAA violation."
+    },
+    "hl7_probe": {
+      "expected": "summary.get('mllp_port_open') is not None",
+      "note": "HL7 MLLP/FHIR. Consent filtering = RGPD."
+    },
+    "med_device_probe": {
+      "expected": "summary.get('ports_open') is not None",
+      "note": "Dispositifs médicaux. URGENT/11 = FDA recall."
+    },
+    "jwt_oauth_probe": {
+      "expected": "summary.get('jwt_decoded') is not None",
+      "note": "SMART on FHIR OAuth."
+    },
+    "post_exploit_enum": {
+      "expected": "summary.get('summary') is not None",
+      "note": "HVT : Epic, Cerner, PACS, dispositifs."
+    },
+    "persistence": {
+      "expected": "summary.get('deployed') is not None",
+      "note": "LAB=1. Persistence sur PACS/HIS."
+    }
+  }
+}

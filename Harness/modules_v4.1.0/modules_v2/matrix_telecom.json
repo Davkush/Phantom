@@ -1,0 +1,31 @@
+{
+  "harness": "3.0.0",
+  "schema_version": "2.0",
+  "sector": "telecom",
+  "targets": {
+    "ss7_probe": {
+      "expected": "summary.get('sctp_reachable') is not None",
+      "note": "SS7/Diameter. SMS interception = banking 2FA bypass."
+    },
+    "sip_probe": {
+      "expected": "summary.get('register_accepted') is not None",
+      "note": "SIP VoIP. Toll fraud = coût financier direct."
+    },
+    "jwt_oauth_probe": {
+      "expected": "summary.get('jwt_decoded') is not None",
+      "note": "OSS/BSS API OAuth."
+    },
+    "websocket_probe": {
+      "expected": "summary.get('connected') is not None",
+      "note": "WebSocket telecom APIs."
+    },
+    "post_exploit_enum": {
+      "expected": "summary.get('summary') is not None",
+      "note": "HVT : MME, HSS, SMF, billing."
+    },
+    "persistence": {
+      "expected": "summary.get('deployed') is not None",
+      "note": "LAB=1. Persistence sur core network."
+    }
+  }
+}

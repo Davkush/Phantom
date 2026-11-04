@@ -1,0 +1,122 @@
+{
+  "sector": "banking",
+  "modules": {
+    "swift_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/banking/swift_probe.py",
+        "127.0.0.1",
+        "9443"
+      ]
+    },
+    "iso8583_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/banking/iso8583_probe.py",
+        "127.0.0.1",
+        "5000"
+      ]
+    },
+    "core_banking_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/banking/core_banking_probe.py",
+        "http://127.0.0.1:9080"
+      ]
+    },
+    "open_banking_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/banking/open_banking_probe.py",
+        "https://127.0.0.1"
+      ]
+    },
+    "jwt_oauth_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/banking/jwt_oauth_probe.py",
+        "https://127.0.0.1"
+      ]
+    },
+    "post_exploit_enum": {
+      "cmd": [
+        "python3",
+        "./post_exploit_enum.py"
+      ]
+    },
+    "persistence": {
+      "cmd": [
+        "python3",
+        "./persistence_module.py",
+        "all"
+      ]
+    },
+    "osint_leak": {
+      "cmd": [
+        "python3",
+        "./osint_leak.py",
+        "example.com",
+        "./source"
+      ]
+    },
+    "sqli": {
+      "cmd": [
+        "python3",
+        "./sqli_module.py",
+        "http://127.0.0.1:8080/api",
+        "device_id"
+      ]
+    },
+    "static_analysis": {
+      "cmd": [
+        "python3",
+        "./static_analysis.py",
+        "./source"
+      ]
+    },
+    "binary_re": {
+      "cmd": [
+        "python3",
+        "./binary_re.py",
+        "./target_binary",
+        "vulns"
+      ]
+    },
+    "firmware_re": {
+      "cmd": [
+        "python3",
+        "./firmware_re.py",
+        "./firmware.bin"
+      ]
+    },
+    "strings_secrets": {
+      "cmd": [
+        "python3",
+        "./strings_secrets.py",
+        "./target_binary"
+      ]
+    },
+    "protocol_re": {
+      "cmd": [
+        "python3",
+        "./protocol_re.py",
+        "./capture.pcap"
+      ]
+    },
+    "smart_contract_re": {
+      "cmd": [
+        "python3",
+        "./smart_contract_re.py",
+        "0x60806040"
+      ]
+    },
+    "ids_test": {
+      "cmd": [
+        "python3",
+        "./ids_test.py",
+        "127.0.0.1/32",
+        "22"
+      ]
+    }
+  }
+}

@@ -1,0 +1,141 @@
+{
+  "harness": "3.2.0",
+  "schema_version": "1.0",
+  "targets": {
+    "php_uaf": {
+      "schema_version": "1.0",
+      "php": "7.4.33-debug-asan",
+      "expected": "summary.get('gc_cycles', 0) > 0",
+      "note": "gc_cycles > 0 valide la collecte de cycles. gc_reuse_proxy_ratio mesure le grooming (proxy spl_object_id)."
+    },
+    "php_chain": {
+      "schema_version": "1.0",
+      "monolog": "2.9.1",
+      "guzzle": "7.4.5",
+      "expected": "summary.get('payload_sha256') is not None and summary.get('stable_across_10_runs') is True and summary.get('functional_validation') is True",
+      "note": "Stabilit\u00e9 byte-\u00e0-byte + validation fonctionnelle de la d\u00e9s\u00e9rialisation."
+    },
+    "c_heap": {
+      "schema_version": "1.0",
+      "glibc": "2.31",
+      "expected": "'UAF_HARNESS_OK' in (summary.get('raw_full') or summary.get('raw_head') or '')",
+      "note": "raw_full = stdout complet (fallback raw_head si None). Le module C sort du texte."
+    },
+    "gdb_extract": {
+      "schema_version": "1.0",
+      "php-fpm": "7.4",
+      "expected": "'regions_scanned' in summary",
+      "note": "regions_scanned pr\u00e9sent valide l'ex\u00e9cution (pas regions_found>=0 qui est tautologie)."
+    },
+    "esxi_evasion": {
+      "schema_version": "1.0",
+      "esxi": "7.0",
+      "expected": "summary.get('status') == 'evasion_active'",
+      "note": "Status evasion_active valide neutralisation + persistance."
+    },
+    "preauth": {
+      "schema_version": "1.0",
+      "cgi": "vuln",
+      "expected": "summary.get('any_leak') is True",
+      "note": "any_leak true si au moins une variante d\u00e9clenche uid=/root:."
+    },
+    "docker_escape": {
+      "schema_version": "1.0",
+      "docker": "20.10+",
+      "socket": "rw",
+      "expected": "summary.get('escape_ok') is True",
+      "note": "escape_ok true si uid= ou root: visible dans les logs."
+    },
+    "waf_bypass": {
+      "schema_version": "1.0",
+      "waf": "modsec-crs",
+      "expected": "summary.get('any_bypass') is True",
+      "note": "any_bypass true si au moins une variante passe le WAF."
+    },
+    "fuzzer_send": {
+      "schema_version": "1.0",
+      "seed": 1337,
+      "expected": "summary.get('total', 0) > 0",
+      "note": "total > 0 valide que des payloads ont \u00e9t\u00e9 g\u00e9n\u00e9r\u00e9s et envoy\u00e9s."
+    },
+    "afl_fuzz": {
+      "schema_version": "1.0",
+      "afl": "AFLplusplus-4.20c",
+      "expected": "summary.get('execs_done') is not None",
+      "note": "execs_done pr\u00e9sent valide que la campagne a d\u00e9marr\u00e9."
+    },
+    "static_analysis": {
+      "schema_version": "1.0",
+      "semgrep": "1.50+",
+      "codeql": "2.14+",
+      "expected": "summary.get('semgrep_total') is not None",
+      "note": "semgrep_total pr\u00e9sent valide l'ex\u00e9cution de l'analyse."
+    },
+    "llm_exploit": {
+      "schema_version": "1.0",
+      "model": "llama3",
+      "expected": "summary.get('iterations') is not None",
+      "note": "iterations pr\u00e9sent valide que la boucle a tourn\u00e9. success peut \u00eatre False."
+    },
+    "osint_leak": {
+      "schema_version": "1.1",
+      "expected": "summary.get('subdomains_found') is not None",
+      "note": "Phase 1 recon. subdomains_found pr\u00e9sent valide l'ex\u00e9cution (peut \u00eatre 0)."
+    },
+    "sqli": {
+      "schema_version": "1.1",
+      "expected": "summary.get('injection_found') is not None",
+      "note": "Phase 2 acc\u00e8s. injection_found True si SQLi d\u00e9tect\u00e9e (error/boolean/time/union)."
+    },
+    "ssrf": {
+      "schema_version": "1.1",
+      "expected": "summary.get('ssrf_found') is not None",
+      "note": "Phase 2 acc\u00e8s. ssrf_found True si metadata leak ou internal port accessible."
+    },
+    "post_exploit_enum": {
+      "schema_version": "1.1",
+      "expected": "summary.get('summary') is not None",
+      "note": "Phase 3 enum. summary pr\u00e9sent valide l'\u00e9num\u00e9ration locale (process/files/net/secrets)."
+    },
+    "persistence": {
+      "schema_version": "1.1",
+      "expected": "summary.get('deployed') is not None and len(summary.get('deployed', [])) > 0",
+      "note": "Phase 4 persistence. deployed non-vide valide qu'au moins 1 m\u00e9canisme d\u00e9ploy\u00e9. LAB=1 requis."
+    },
+    "binary_re": {
+      "schema_version": "1.2",
+      "expected": "summary.get('functions') is not None",
+      "note": "RE binaire \u2014 analyse de fonctions, imports, vuln\u00e9rabilit\u00e9s. LAB=1 requis."
+    },
+    "firmware_re": {
+      "schema_version": "1.2",
+      "expected": "summary.get('signatures_found') is not None",
+      "note": "RE firmware \u2014 extraction filesystem, credentials, backdoors. LAB=1 requis."
+    },
+    "strings_secrets": {
+      "schema_version": "1.2",
+      "expected": "summary.get('total_strings') is not None",
+      "note": "Extraction secrets \u2014 cl\u00e9s, tokens, credentials hardcod\u00e9s. LAB=1 requis."
+    },
+    "protocol_re": {
+      "schema_version": "1.2",
+      "expected": "summary.get('packets_analyzed') is not None",
+      "note": "RE protocole \u2014 inf\u00e9rence structure, seeds pour fuzzer. LAB=1 requis."
+    },
+    "malware_sandbox": {
+      "schema_version": "1.2",
+      "expected": "summary.get('detonation_ok') is not None",
+      "note": "Sandbox malware \u2014 IOCs, processus, r\u00e9seau. LAB=1 + MALWARE_ANALYSIS_CONFIRMED=1 requis."
+    },
+    "smart_contract_re": {
+      "schema_version": "1.2",
+      "expected": "summary.get('functions_found') is not None",
+      "note": "RE smart contract \u2014 d\u00e9compilation EVM, vuln\u00e9rabilit\u00e9s. LAB=1 requis."
+    },
+    "ids_test": {
+      "schema_version": "1.3",
+      "expected": "summary.get('techniques_tested') is not None and summary.get('techniques_tested', 0) > 0",
+      "note": "Test IDS/IPS \u2014 8 techniques (TCP connect, SYN, FIN, NULL, Xmas, ACK, timing, decoy). Blue team checklist inclus."
+    }
+  }
+}

@@ -1,0 +1,7 @@
+# HARNESS-VALIDATION v2.2.0 — dépendances Python épinglées.
+requests==2.31.0
+h2==4.1.0
+pypdf==4.0.0
+# Optionnel pour analyse statique :
+# semgrep nécessite une installation séparée (pip install semgrep)
+# CodeQL nécessite une installation séparée (https://codeql.github.com/)

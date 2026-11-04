@@ -1,0 +1,125 @@
+{
+  "sector": "energy",
+  "modules": {
+    "iec104_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/ot/iec104_probe.py",
+        "127.0.0.1",
+        "2404"
+      ]
+    },
+    "dnp3_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/ot/dnp3_probe.py",
+        "127.0.0.1",
+        "20000"
+      ]
+    },
+    "iec61850_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/energy/iec61850_probe.py",
+        "127.0.0.1",
+        "102"
+      ]
+    },
+    "synchrophasor_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/energy/synchrophasor_probe.py",
+        "127.0.0.1",
+        "19999"
+      ]
+    },
+    "modbus_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/ot/modbus_probe.py",
+        "127.0.0.1",
+        "502"
+      ]
+    },
+    "post_exploit_enum": {
+      "cmd": [
+        "python3",
+        "./post_exploit_enum.py"
+      ]
+    },
+    "persistence": {
+      "cmd": [
+        "python3",
+        "./persistence_module.py",
+        "all"
+      ]
+    },
+    "osint_leak": {
+      "cmd": [
+        "python3",
+        "./osint_leak.py",
+        "example.com",
+        "./source"
+      ]
+    },
+    "static_analysis": {
+      "cmd": [
+        "python3",
+        "./static_analysis.py",
+        "./source"
+      ]
+    },
+    "binary_re": {
+      "cmd": [
+        "python3",
+        "./binary_re.py",
+        "./target_binary",
+        "vulns"
+      ]
+    },
+    "firmware_re": {
+      "cmd": [
+        "python3",
+        "./firmware_re.py",
+        "./firmware.bin"
+      ]
+    },
+    "strings_secrets": {
+      "cmd": [
+        "python3",
+        "./strings_secrets.py",
+        "./target_binary"
+      ]
+    },
+    "protocol_re": {
+      "cmd": [
+        "python3",
+        "./protocol_re.py",
+        "./capture.pcap"
+      ]
+    },
+    "smart_contract_re": {
+      "cmd": [
+        "python3",
+        "./smart_contract_re.py",
+        "0x60806040"
+      ]
+    },
+    "ids_test": {
+      "cmd": [
+        "python3",
+        "./ids_test.py",
+        "127.0.0.1/32",
+        "22"
+      ]
+    },
+    "mqtt_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/ot/mqtt_probe.py",
+        "127.0.0.1",
+        "1883"
+      ]
+    }
+  }
+}

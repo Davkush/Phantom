@@ -1,0 +1,14 @@
+{
+  "harness": "4.0.0", "sector": "buildings", "schema_version": "1.4",
+  "targets": {
+    "osint_leak":        { "expected": "summary.get('subdomains_found') is not None" },
+    "bacnet_probe":      { "expected": "summary.get('devices_found') is not None", "note": "devices_found > 0 = HVAC contrôlable" },
+    "modbus_probe":      { "expected": "summary.get('device_identified') is not None" },
+    "mqtt_probe":        { "expected": "summary.get('broker_accessible') is not None" },
+    "snmp_probe":        { "expected": "summary.get('devices_found') is not None" },
+    "post_exploit_enum": { "expected": "summary.get('sector') == 'buildings'" },
+    "persistence":       { "expected": "summary.get('lab_guard') == 'passed'" },
+    "static_analysis":   { "expected": "summary.get('semgrep_total') is not None" },
+    "ids_test":          { "expected": "summary.get('techniques_tested', 0) > 0" }
+  }
+}

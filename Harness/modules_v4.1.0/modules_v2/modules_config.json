@@ -1,0 +1,731 @@
+{
+  "_version": "4.0.0",
+  "_note": "Configuration multi-sectorielle unifi\u00e9e. Le champ 'sectors' filtre par SECTOR env var. Absent = module universel.",
+  "modules": {
+    "osint_leak": {
+      "cmd": [
+        "python3",
+        "./osint_leak.py",
+        "example.com",
+        "./source"
+      ],
+      "sectors": [
+        "crypto",
+        "ot",
+        "banking",
+        "health",
+        "energy",
+        "telecom",
+        "buildings"
+      ]
+    },
+    "post_exploit_enum": {
+      "cmd": [
+        "python3",
+        "./post_exploit_enum.py"
+      ]
+    },
+    "persistence": {
+      "cmd": [
+        "python3",
+        "./persistence_module.py",
+        "all"
+      ]
+    },
+    "static_analysis": {
+      "cmd": [
+        "python3",
+        "./static_analysis.py",
+        "./source"
+      ]
+    },
+    "ids_test": {
+      "cmd": [
+        "python3",
+        "./ids_test.py",
+        "127.0.0.1/32",
+        "22"
+      ],
+      "sectors": [
+        "crypto",
+        "ot",
+        "banking",
+        "health",
+        "energy",
+        "telecom",
+        "buildings"
+      ]
+    },
+    "sqli": {
+      "cmd": [
+        "python3",
+        "./sqli_module.py",
+        "http://127.0.0.1:8080/api",
+        "device_id"
+      ],
+      "sectors": [
+        "crypto",
+        "banking",
+        "health",
+        "telecom"
+      ]
+    },
+    "ssrf": {
+      "cmd": [
+        "python3",
+        "./ssrf_module.py",
+        "http://127.0.0.1:8080/fetch",
+        "url"
+      ],
+      "sectors": [
+        "crypto",
+        "banking",
+        "health",
+        "telecom"
+      ]
+    },
+    "preauth": {
+      "cmd": [
+        "python3",
+        "./preauth.py",
+        "http://127.0.0.1:8080"
+      ],
+      "sectors": [
+        "crypto"
+      ]
+    },
+    "waf_bypass": {
+      "cmd": [
+        "python3",
+        "./waf_bypass.py",
+        "127.0.0.1",
+        "8080"
+      ],
+      "sectors": [
+        "crypto",
+        "banking"
+      ]
+    },
+    "fuzzer_send": {
+      "cmd": [
+        "python3",
+        "./fuzzer_send.py",
+        "http://127.0.0.1:8080/cgi-bin/admin.cgi"
+      ],
+      "sectors": [
+        "crypto"
+      ]
+    },
+    "docker_escape": {
+      "cmd": [
+        "python3",
+        "./docker_escape.py"
+      ],
+      "sectors": [
+        "crypto",
+        "banking"
+      ]
+    },
+    "gdb_extract": {
+      "cmd": [
+        "bash",
+        "./gdb_extract.sh"
+      ],
+      "sectors": [
+        "crypto",
+        "banking"
+      ]
+    },
+    "php_uaf": {
+      "cmd": [
+        "php",
+        "./php_uaf.php"
+      ],
+      "sectors": [
+        "crypto"
+      ]
+    },
+    "php_chain": {
+      "cmd": [
+        "php",
+        "./php_chain.php"
+      ],
+      "sectors": [
+        "crypto"
+      ]
+    },
+    "c_heap": {
+      "cmd": [
+        "./c_heap_exploit"
+      ],
+      "sectors": [
+        "crypto"
+      ]
+    },
+    "esxi_evasion": {
+      "cmd": [
+        "bash",
+        "./esxi_evasion.sh"
+      ],
+      "sectors": [
+        "crypto"
+      ]
+    },
+    "afl_fuzz": {
+      "cmd": [
+        "python3",
+        "./fuzz_module.py",
+        "./target_binary",
+        "60"
+      ],
+      "sectors": [
+        "crypto"
+      ]
+    },
+    "llm_exploit": {
+      "cmd": [
+        "python3",
+        "./llm_exploit_loop.py",
+        "./target_binary",
+        "5"
+      ],
+      "sectors": [
+        "crypto"
+      ]
+    },
+    "binary_re": {
+      "cmd": [
+        "python3",
+        "./binary_re.py",
+        "./target_binary",
+        "vulns"
+      ]
+    },
+    "firmware_re": {
+      "cmd": [
+        "python3",
+        "./firmware_re.py",
+        "./firmware.bin"
+      ]
+    },
+    "strings_secrets": {
+      "cmd": [
+        "python3",
+        "./strings_secrets.py",
+        "./target_binary"
+      ]
+    },
+    "protocol_re": {
+      "cmd": [
+        "python3",
+        "./protocol_re.py",
+        "./capture.pcap"
+      ]
+    },
+    "malware_sandbox": {
+      "cmd": [
+        "python3",
+        "./malware_sandbox.py",
+        "./sample.bin",
+        "30"
+      ]
+    },
+    "smart_contract_re": {
+      "cmd": [
+        "python3",
+        "./smart_contract_re.py",
+        "0x60806040"
+      ]
+    },
+    "modbus_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/ot/modbus_probe.py",
+        "127.0.0.1",
+        "502"
+      ],
+      "sectors": [
+        "ot",
+        "energy",
+        "buildings"
+      ]
+    },
+    "dnp3_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/ot/dnp3_probe.py",
+        "127.0.0.1",
+        "20000"
+      ],
+      "sectors": [
+        "ot",
+        "energy"
+      ]
+    },
+    "s7comm_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/ot/s7comm_probe.py",
+        "127.0.0.1",
+        "102"
+      ],
+      "sectors": [
+        "ot"
+      ]
+    },
+    "opcua_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/ot/opcua_probe.py",
+        "127.0.0.1",
+        "4840"
+      ],
+      "sectors": [
+        "ot",
+        "energy"
+      ]
+    },
+    "iec104_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/ot/iec104_probe.py",
+        "127.0.0.1",
+        "2404"
+      ],
+      "sectors": [
+        "ot",
+        "energy"
+      ]
+    },
+    "bacnet_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/ot/bacnet_probe.py",
+        "127.0.0.1",
+        "47808"
+      ],
+      "sectors": [
+        "buildings",
+        "energy",
+        "ot"
+      ]
+    },
+    "ethernetip_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/ot/ethernetip_probe.py",
+        "127.0.0.1",
+        "44818"
+      ],
+      "sectors": [
+        "ot"
+      ]
+    },
+    "mqtt_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/ot/mqtt_probe.py",
+        "127.0.0.1",
+        "1883"
+      ],
+      "sectors": [
+        "ot",
+        "energy",
+        "buildings",
+        "health"
+      ]
+    },
+    "profinet_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/ot/profinet_probe.py",
+        "eth0",
+        "5"
+      ],
+      "sectors": [
+        "ot"
+      ]
+    },
+    "swift_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/banking/swift_probe.py",
+        "127.0.0.1",
+        "9443"
+      ],
+      "sectors": [
+        "banking"
+      ]
+    },
+    "iso8583_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/banking/iso8583_probe.py",
+        "127.0.0.1",
+        "5000"
+      ],
+      "sectors": [
+        "banking"
+      ]
+    },
+    "core_banking_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/banking/core_banking_probe.py",
+        "http://127.0.0.1:9080"
+      ],
+      "sectors": [
+        "banking"
+      ]
+    },
+    "open_banking_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/banking/open_banking_probe.py",
+        "https://127.0.0.1"
+      ],
+      "sectors": [
+        "banking"
+      ]
+    },
+    "psd2_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/banking/psd2_probe.py",
+        "https://127.0.0.1"
+      ],
+      "sectors": [
+        "banking"
+      ]
+    },
+    "ebics_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/banking/ebics_probe.py",
+        "127.0.0.1",
+        "9443"
+      ],
+      "sectors": [
+        "banking"
+      ]
+    },
+    "sftp_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/banking/sftp_probe.py",
+        "127.0.0.1",
+        "22"
+      ],
+      "sectors": [
+        "banking"
+      ]
+    },
+    "as2_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/banking/as2_probe.py",
+        "127.0.0.1",
+        "8080"
+      ],
+      "sectors": [
+        "banking"
+      ]
+    },
+    "ftps_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/banking/ftps_probe.py",
+        "127.0.0.1",
+        "990"
+      ],
+      "sectors": [
+        "banking"
+      ]
+    },
+    "jwt_oauth_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/banking/jwt_oauth_probe.py",
+        "https://127.0.0.1"
+      ],
+      "sectors": [
+        "banking",
+        "health",
+        "telecom"
+      ]
+    },
+    "eth_rpc_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/crypto/eth_rpc_probe.py",
+        "127.0.0.1",
+        "8545"
+      ],
+      "sectors": [
+        "crypto"
+      ]
+    },
+    "wallet_extract": {
+      "cmd": [
+        "python3",
+        "./protocols/crypto/wallet_extract.py"
+      ],
+      "sectors": [
+        "crypto"
+      ]
+    },
+    "dicom_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/health/dicom_probe.py",
+        "127.0.0.1",
+        "104"
+      ],
+      "sectors": [
+        "health"
+      ]
+    },
+    "hl7_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/health/hl7_probe.py",
+        "127.0.0.1",
+        "2575"
+      ],
+      "sectors": [
+        "health"
+      ]
+    },
+    "fhir_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/health/fhir_probe.py",
+        "127.0.0.1",
+        "8080"
+      ],
+      "sectors": [
+        "health"
+      ]
+    },
+    "med_device_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/health/med_device_probe.py",
+        "127.0.0.1"
+      ],
+      "sectors": [
+        "health"
+      ]
+    },
+    "ieee11073_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/health/ieee11073_probe.py",
+        "127.0.0.1"
+      ],
+      "sectors": [
+        "health"
+      ]
+    },
+    "poct1_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/health/poct1_probe.py",
+        "127.0.0.1"
+      ],
+      "sectors": [
+        "health"
+      ]
+    },
+    "mqtt_health_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/health/mqtt_health_probe.py",
+        "127.0.0.1",
+        "8883"
+      ],
+      "sectors": [
+        "health"
+      ]
+    },
+    "iec61850_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/energy/iec61850_probe.py",
+        "127.0.0.1",
+        "102"
+      ],
+      "sectors": [
+        "energy"
+      ]
+    },
+    "iec62351_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/energy/iec62351_probe.py",
+        "127.0.0.1"
+      ],
+      "sectors": [
+        "energy"
+      ]
+    },
+    "dnp3_sav5_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/energy/dnp3_sav5_probe.py",
+        "127.0.0.1",
+        "20000"
+      ],
+      "sectors": [
+        "energy"
+      ]
+    },
+    "iccp_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/energy/iccp_probe.py",
+        "127.0.0.1"
+      ],
+      "sectors": [
+        "energy"
+      ]
+    },
+    "dlms_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/energy/dlms_probe.py",
+        "127.0.0.1"
+      ],
+      "sectors": [
+        "energy"
+      ]
+    },
+    "synchrophasor_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/energy/synchrophasor_probe.py",
+        "127.0.0.1",
+        "19999"
+      ],
+      "sectors": [
+        "energy"
+      ]
+    },
+    "ss7_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/telecom/ss7_probe.py",
+        "127.0.0.1",
+        "2905"
+      ],
+      "sectors": [
+        "telecom"
+      ]
+    },
+    "sip_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/telecom/sip_probe.py",
+        "127.0.0.1",
+        "5060"
+      ],
+      "sectors": [
+        "telecom"
+      ]
+    },
+    "websocket_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/telecom/websocket_probe.py",
+        "ws://127.0.0.1:8080/ws"
+      ],
+      "sectors": [
+        "telecom",
+        "crypto"
+      ]
+    },
+    "netconf_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/telecom/netconf_probe.py",
+        "127.0.0.1",
+        "830"
+      ],
+      "sectors": [
+        "telecom"
+      ]
+    },
+    "restconf_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/telecom/restconf_probe.py",
+        "https://127.0.0.1"
+      ],
+      "sectors": [
+        "telecom"
+      ]
+    },
+    "grpc_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/telecom/grpc_probe.py",
+        "127.0.0.1",
+        "50051"
+      ],
+      "sectors": [
+        "telecom",
+        "crypto"
+      ]
+    },
+    "gprs_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/telecom/gprs_probe.py",
+        "127.0.0.1"
+      ],
+      "sectors": [
+        "telecom"
+      ]
+    },
+    "http2_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/telecom/http2_probe.py",
+        "127.0.0.1",
+        "8080"
+      ],
+      "sectors": [
+        "telecom",
+        "crypto",
+        "banking"
+      ]
+    },
+    "http3_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/telecom/http3_probe.py",
+        "127.0.0.1",
+        "8443"
+      ],
+      "sectors": [
+        "telecom",
+        "crypto",
+        "banking"
+      ]
+    },
+    "snmp_probe": {
+      "cmd": [
+        "python3",
+        "./protocols/telecom/snmp_probe.py",
+        "127.0.0.1",
+        "161"
+      ],
+      "sectors": [
+        "telecom",
+        "ot",
+        "energy",
+        "buildings"
+      ]
+    }
+  }
+}

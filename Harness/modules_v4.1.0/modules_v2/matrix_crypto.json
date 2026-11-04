@@ -1,0 +1,27 @@
+{
+  "harness": "4.0.0", "sector": "crypto", "schema_version": "1.4",
+  "targets": {
+    "php_uaf":           { "expected": "summary.get('gc_cycles', 0) > 0 and summary.get('dtor_invocations', 0) > 0" },
+    "php_chain":         { "expected": "summary.get('payload_sha256') is not None and summary.get('file_write_verified') is True" },
+    "c_heap":            { "expected": "'UAF_HARNESS_OK' in (summary.get('raw_full') or summary.get('raw_head') or '')" },
+    "gdb_extract":       { "expected": "'regions_scanned' in summary and summary.get('budget_exhausted') is not None" },
+    "esxi_evasion":      { "expected": "summary.get('status') == 'evasion_active'" },
+    "preauth":           { "expected": "summary.get('any_leak') is True" },
+    "docker_escape":     { "expected": "summary.get('escape_ok') is True" },
+    "waf_bypass":        { "expected": "summary.get('any_bypass') is True" },
+    "fuzzer_send":       { "expected": "summary.get('total', 0) > 0" },
+    "afl_fuzz":          { "expected": "summary.get('execs_done') is not None" },
+    "static_analysis":   { "expected": "summary.get('semgrep_total') is not None" },
+    "llm_exploit":       { "expected": "summary.get('iterations') is not None and summary.get('sandbox') in ('nsjail', 'bwrap')" },
+    "osint_leak":        { "expected": "summary.get('subdomains_found') is not None" },
+    "sqli":              { "expected": "summary.get('variants_tested', 0) > 0" },
+    "ssrf":              { "expected": "summary.get('ip_bypasses_tested', 0) > 0" },
+    "eth_rpc_probe":     { "expected": "summary.get('rpc_accessible') is not None", "note": "eth_accounts_exposed=True = CRITICAL" },
+    "wallet_extract":    { "expected": "summary.get('keys_found') is not None", "note": "keys_found > 0 = clés privées en mémoire" },
+    "post_exploit_enum": { "expected": "summary.get('platform') is not None" },
+    "persistence":       { "expected": "summary.get('lab_guard') == 'passed'" },
+    "ids_test":          { "expected": "summary.get('techniques_tested', 0) > 0" },
+    "binary_re":         { "expected": "summary.get('functions') is not None" },
+    "strings_secrets":   { "expected": "summary.get('total_strings') is not None" }
+  }
+}

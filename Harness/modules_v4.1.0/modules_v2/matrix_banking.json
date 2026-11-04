@@ -1,0 +1,31 @@
+{
+  "harness": "3.0.0",
+  "schema_version": "2.0",
+  "sector": "banking",
+  "targets": {
+    "swift_probe": {
+      "expected": "summary.get('alliance_accessible') is not None",
+      "note": "Alliance Access accessible = surface SWIFT. DORA."
+    },
+    "iso8583_probe": {
+      "expected": "summary.get('switch_reachable') is not None",
+      "note": "Switch cartes accessible. PCI-DSS."
+    },
+    "core_banking_probe": {
+      "expected": "summary.get('core_vendor') is not None",
+      "note": "Core banking identifié. Énumération comptes = critique."
+    },
+    "jwt_oauth_probe": {
+      "expected": "summary.get('jwt_decoded') is not None",
+      "note": "JWT/OAuth API banking. alg:none = critique PSD2."
+    },
+    "post_exploit_enum": {
+      "expected": "summary.get('summary') is not None",
+      "note": "HVT : T24, Murex, Calypso, HSM, mainframe."
+    },
+    "persistence": {
+      "expected": "summary.get('deployed') is not None",
+      "note": "LAB=1. Persistence sur terminal SWIFT."
+    }
+  }
+}
