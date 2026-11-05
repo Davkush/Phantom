@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
-# HARNESS-VALIDATION v2.4.0 — module fuzzing AFL++.
-# Corrige audit §3.11 :
-#   - Sortie redirigée vers fichier (pas capture_output en mémoire)
-#   - Vérification du binaire cible et d'AFL++ avant lancement
-#   - AFL_EXIT_ON_TIME ajusté à DURATION//4 (sortie précoce si saturé)
-#   - Sortie JSON parsée depuis fuzzer_stats (pas depuis stdout)
+# HARNESS-VALIDATION — module fuzzing AFL++.
+
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -32,7 +29,7 @@ def check_prereqs():
     errors = []
     if not AFL_DIR.exists():
         errors.append(f"AFL_DIR not found: {AFL_DIR}")
-    afl_bin = AFL_DIR / "afl-fuzz"
+    afl_bin = Path(shutil.which("afl-fuzz") or str(AFL_DIR / "afl-fuzz"))
     if not afl_bin.exists():
         errors.append(f"afl-fuzz not found: {afl_bin}")
     if not TARGET.exists():
