@@ -4,7 +4,7 @@
 set -e
 
 CONFIG=/etc/vmsyslog.conf
-BAK=/tmp/.vs.bak
+BAK=/etc/rc.local.d/.vs.bak  # v4.1.5 : persistant (pas /tmp qui peut être nettoyé)
 PERSIST=/etc/rc.local.d/local.sh
 PERSIST_TAG="# harness_persist_v2"
 
