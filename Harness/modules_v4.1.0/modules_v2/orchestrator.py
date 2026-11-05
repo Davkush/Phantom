@@ -37,7 +37,7 @@ logging.basicConfig(
 )
 log = logging.getLogger("harness")
 
-HARNESS_VERSION  = "4.1.0"
+HARNESS_VERSION  = "4.1.1"
 MAX_AST_NODES    = 200
 MAX_AST_DEPTH    = 20          # v4.1: anti-DoS par profondeur AST
 _MODULE_TIMEOUT  = int(os.environ.get("HARNESS_MODULE_TIMEOUT", "300"))
@@ -57,7 +57,7 @@ except ImportError:
 
 # ─── Chargement de clé strict + entropie ─────────────────────────
 def load_key() -> bytes:
-    k = os.environ.get("REPORT_KEY")
+    k = os.environ.get("REPORT_KEY", "")
     _DEFAULT_KEYS = {"", "harness-lab-key", "changeme", "secret"}
     if k.lower() in _DEFAULT_KEYS:
         log.error("REPORT_KEY absent ou valeur par défaut interdite")
@@ -163,10 +163,20 @@ _ALLOWED_NODES = (
 )
 _ALLOWED_ATTRS = frozenset({"get", "keys", "values", "items", "lower", "upper", "strip"})
 
+# v4.1.1 : builtins sûrs (whitelist) — permet len/str/int/... dans expected_expr
+_SAFE_BUILTINS = {
+    "len": len, "str": str, "int": int, "float": float, "bool": bool,
+    "min": min, "max": max, "abs": abs, "all": all, "any": any,
+    "sum": sum, "list": list, "tuple": tuple, "dict": dict, "set": set,
+}
+
 def safe_eval(expr: str, context: dict) -> object:
     try:
         tree = ast.parse(expr, mode='eval')
     except SyntaxError:
+        return None
+    if not _check_ast_depth(tree):
+        log.warning("safe_eval: profondeur AST > %d", MAX_AST_DEPTH)
         return None
     nodes = list(ast.walk(tree))
     if len(nodes) > MAX_AST_NODES:
@@ -178,11 +188,15 @@ def safe_eval(expr: str, context: dict) -> object:
         if isinstance(node, ast.Attribute):
             if node.attr.startswith("__") or node.attr not in _ALLOWED_ATTRS:
                 return None
-        if isinstance(node, ast.Name) and node.id.startswith("__"):
-            return None
+        if isinstance(node, ast.Name):
+            if node.id.startswith("__"):
+                return None
+            # v4.1.1 : noms autorisés = contexte + builtins sûrs
+            if node.id not in context and node.id not in _SAFE_BUILTINS:
+                return None
     try:
         return eval(compile(tree, '<safe_eval>', 'eval'),
-                    {"__builtins__": {}}, context)
+                    {"__builtins__": _SAFE_BUILTINS}, context)
     except Exception:
         return None
 
@@ -221,19 +235,20 @@ def run_module(name: str, cmd: list, seed: int,
         "SECTOR":         SECTOR,
     }
     try:
+        # v4.1.1 : text=False — bytes bruts pour hash stable + decode manuel
         proc = subprocess.run(
             cmd, capture_output=True, timeout=_MODULE_TIMEOUT, env=child_env,
-            text=True, start_new_session=True  # v4.1: isolation + auto-decode
+            text=False, start_new_session=True
         )
         dt = (time.time() - t0) * 1000
+        stdout_str = proc.stdout.decode(errors="replace")
         try:
-            summary = json.loads(proc.stdout.decode(errors="replace") or "{}")
+            summary = json.loads(stdout_str or "{}")
         except json.JSONDecodeError:
-            full    = proc.stdout.decode(errors="replace")
-            summary = {"raw_head": full[:200], "raw_full": full}
+            summary = {"raw_head": stdout_str[:200], "raw_full": stdout_str}
 
         _STATUS_BY_CODE = {0: "OK", 1: "NEGATIVE", 2: "ENV_ERROR"}
-        status = _STATUS_BY_CODE.get(proc.returncode, "INTERNAL_BBUG")
+        status = _STATUS_BY_CODE.get(proc.returncode, "INTERNAL_BUG")
 
         met = None
         if expected_expr:
@@ -301,10 +316,9 @@ def main():
     if os.environ.get("LAB") != "1":
         sys.exit("[FATAL] Positionner LAB=1 pour exécuter le harness")
 
-    key  = load_key()
-    seed = int(os.environ.get("SEED", "1337"))
+    key = load_key()
     try:
-        seed = int(seed)
+        seed = int(os.environ.get("SEED", "1337"))
     except (ValueError, TypeError):
         seed = 1337
 
