@@ -1,7 +1,6 @@
 <?php
-// HARNESS-VALIDATION v2.4.0 — PHP 7.4.x debug + ASAN.
-// UAF via cycle GC + grooming de chunk. Métriques honnêtes.
-// Corrige audit §3.2 : pas de préservation, métrique slots_reused, note ASAN.
+// HARNESS-VALIDATION — PHP 7.4.x debug + ASAN.
+
 declare(strict_types=1);
 
 final class Gadget {
