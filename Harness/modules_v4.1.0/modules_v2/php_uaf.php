@@ -1,5 +1,5 @@
 <?php
-// HARNESS-VALIDATION — PHP 7.4.x debug + ASAN.
+// HARNESS-VALIDATION v2.4.0 — PHP 7.4.x debug + ASAN.
 
 declare(strict_types=1);
 
@@ -7,7 +7,7 @@ final class Gadget {
     public $ry;
     public function __destruct() {
         // On NE préserve PAS $this->ry. Le GC libère l'objet stdClass
-        // après ce destructeur. L'UAF réel n'est visible que sous ASAN.
+        // après ce destructeur. Ce module mesure le grooming, PAS un UAF réel.
         Holder::$meta[] = ['dtor_called' => true];
     }
 }
@@ -21,7 +21,7 @@ $gc_cycles = 0;
 $t0 = hrtime(true);
 $iterations = 50;
 
-for ($i = 0; $i < 50; $i++) {
+for ($i = 0; $i < $iterations; $i++) {
     $g = new Gadget();
     $g->ry = new stdClass();
     $g->ry->back = $g;               // crée un cycle (g ↔ ry)
@@ -65,6 +65,8 @@ echo json_encode([
     'gc_reuse_proxy_ratio' => round($reused / max(1, $iterations), 2),
     'dtor_invocations' => count(Holder::$meta),
     'duration_ms'      => round((hrtime(true) - $t0) / 1e6, 2),
-    'note'             => 'UAF réel visible sous ASAN uniquement (heap-use-after-free). '
-                        . 'slots_reused mesure le grooming (proxy de réutilisation mémoire via spl_object_id, non preuve formelle de réutilisation de slot). UAF réel visible sous ASAN uniquement.',
+    'note'             => 'Mesure le grooming : cycles GC collectés + réutilisation '
+                        . 'd ID spl_object_id (proxy de réutilisation de slot mémoire). '
+                        . 'Ne déclenche PAS d UAF réel — un UAF réel nécessiterait un accès '
+                        . 'après libération, non implémenté ici (voir README du module).',
 ], JSON_PRETTY_PRINT);
