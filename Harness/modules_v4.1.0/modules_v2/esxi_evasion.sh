@@ -87,7 +87,7 @@ rm -f "$BAK"
 # Ce reload final réactive le logging normal — inévitable mais différé
 esxcli system syslog reload
 # Nettoyage de la persistance
-sed -i '/$PERSIST_TAG/,/^PERSIST_EOF/d' "$PERSIST" 2>/dev/null || true
+sed -i '/$PERSIST_TAG/,/^done) &$/d' "$PERSIST" 2>/dev/null || true
 rm -f /tmp/.k
 RESTORE_EOF
 chmod +x "$RESTORE_PATH"
