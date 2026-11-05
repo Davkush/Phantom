@@ -1,15 +1,6 @@
 #!/usr/bin/env python3
-# HARNESS-VALIDATION v2.4.0 — analyse statique Semgrep + CodeQL.
-# Corrige audit §3.12 :
-#   - Timeout configurable (arg ou env)
-#   - CodeQL : chemin base de données en argument (--codeql-db)
-#   - Query pack explicite (--download-codeql + pack)
-#   - Parsing SARIF (résumé inclus dans la sortie JSON)
-# v2.4 :
-#   - Sortie Semgrep redirigée vers fichier temporaire (anti RAM-bloat)
-#   - Fix CODEQL_DB = Path("") → résolvait "." ; check explicite sur string vide
-#   - Parallélisation des 3 règles Semgrep (ThreadPoolExecutor)
-#   - Capture FileNotFoundError → ENV_ERROR propre si semgrep/codeql absent
+# HARNESS-VALIDATION — analyse statique Semgrep + CodeQL.
+
 import json
 import subprocess
 import sys
@@ -44,7 +35,7 @@ def run_semgrep():
                 proc = subprocess.run(
                     ["semgrep", "--config", rule, "--json", "--quiet",
                      "--timeout", str(TIMEOUT), str(TARGET)],
-                    stdout=open(tmpfile_path, 'w'),
+                    stdout=__import__('contextlib').closing(open(tmpfile_path, 'w')),
                     stderr=subprocess.PIPE,
                     timeout=TIMEOUT + 30)
             except FileNotFoundError:
