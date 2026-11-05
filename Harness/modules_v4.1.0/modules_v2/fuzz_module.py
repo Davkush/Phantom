@@ -24,14 +24,14 @@ class PrereqError(Exception):
     pass
 
 
+# v4.1.5 : résolution unique (PATH en priorité, puis AFL_DIR)
+AFL_BIN = Path(shutil.which("afl-fuzz") or str(AFL_DIR / "afl-fuzz"))
+
 def check_prereqs():
     """Vérifie les prérequis. Lève PrereqError si manquant."""
     errors = []
-    if not AFL_DIR.exists():
-        errors.append(f"AFL_DIR not found: {AFL_DIR}")
-    afl_bin = Path(shutil.which("afl-fuzz") or str(AFL_DIR / "afl-fuzz"))
-    if not afl_bin.exists():
-        errors.append(f"afl-fuzz not found: {afl_bin}")
+    if not AFL_BIN.exists():
+        errors.append(f"afl-fuzz not found (PATH + {AFL_DIR})")
     if not TARGET.exists():
         errors.append(f"target binary not found: {TARGET}")
     if errors:
@@ -59,7 +59,7 @@ def run_fuzz():
            "AFL_NO_UI": "1",
            "AFL_EXIT_ON_TIME": str(exit_on_time),
            "AFL_FAST_CAL": "1"}
-    cmd = [str(AFL_DIR / "afl-fuzz"),
+    cmd = [str(AFL_BIN),
            "-i", str(SEEDS_DIR),
            "-o", str(OUT_DIR),
            "-V", str(DURATION),
